@@ -264,7 +264,8 @@
     var detail = imported && row.source === 'imported-userdata'
       ? 'From Jellyfin\'s watch history' + (row.playCount > 1 ? ' · played ' + row.playCount + ' times' : '')
       : Math.round(row.watchedMinutes) + ' min' + (row.device ? ' · ' + esc(row.device) : '');
-    return '<li class="rtf-act">' +
+    // Focusable so a TV remote can move down the list (and scroll it).
+    return '<li class="rtf-act" tabindex="0">' +
       '<span class="rtf-act-text"><span class="rtf-act-title">' + esc(label.main) + '</span>' +
       '<span class="rtf-act-sub">' + esc(label.sub) + '</span></span>' +
       '<span class="rtf-act-when">' + esc(formatWhen(row.endedUtc || row.startedUtc)) + '<br><span class="rtf-act-sub">' + detail + '</span></span>' +
@@ -282,7 +283,7 @@
         : emptyState('Nothing recorded yet', 'Watch something for at least a minute and it shows up here.');
       target.innerHTML =
         '<div class="rtf-stats">' +
-          stat(me.liveHours, 'hours recorded') +
+          (me.liveMinutes < 60 ? stat(me.liveMinutes, me.liveMinutes === 1 ? 'minute recorded' : 'minutes recorded') : stat(me.liveHours, 'hours recorded')) +
           stat(me.liveSessions, 'watches recorded') +
           stat(me.importedSessions, 'imported from before') +
         '</div>' +

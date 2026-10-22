@@ -28,7 +28,10 @@ Everyone shown on the login screen. Accounts set to *Hide this user from login s
 
 ## Viewing history and privacy
 
-From v0.2, Race to Finish records what each person watches: when, for how long (time actually watched, not skipped), on which device, and what the title is (genres, studio, director, writers, top-billed cast). Watching counts as *finished* at 85% or more. "Mark as played" never counts.
+From v0.2, Race to Finish records what each person watches: when, for how long (time actually watched, not skipped), on which device, and what the title is (genres, studio, director, writers, top-billed cast).
+
+- A movie or episode counts as *finished* once 85% of it has been seen. Skipping ahead, rewinding to rewatch a part, and "mark as played" don't add to that.
+- Picking a viewing up again within 12 hours, near where you stopped, continues the same viewing, even on another device or after a server restart. Pausing for dinner or moving from the TV to bed doesn't split a movie.
 
 - **Private by default.** Each person sees their own history in the **My Activity** tab. The admin sees nothing unless that person turns on *Share my viewing stats with the server admin*.
 - **Your data, your call.** Anyone can download everything stored about them, or delete it. Deleting also stops older history from being imported again.

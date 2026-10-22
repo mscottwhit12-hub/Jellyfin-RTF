@@ -42,24 +42,50 @@ public sealed class HistoryDatabase
     private const int SchemaVersion = 1;
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    private readonly string _connectionString;
+    private readonly string _connectionString = string.Empty;
     private readonly object _lock = new();
 
     /// <summary>Initializes a new instance of the <see cref="HistoryDatabase"/> class.</summary>
     /// <param name="paths">Server paths.</param>
     /// <param name="logger">Logger.</param>
+    /// <remarks>
+    /// Never throws: a problem with this database must not stop Jellyfin from starting. A damaged file is set
+    /// aside and replaced; any other failure leaves the plugin running without history (see <see cref="Error"/>).
+    /// </remarks>
     public HistoryDatabase(IApplicationPaths paths, ILogger<HistoryDatabase> logger)
     {
-        string folder = Path.Combine(paths.DataPath, "race-to-finish");
-        Directory.CreateDirectory(folder);
-        DatabasePath = Path.Combine(folder, "history.db");
-        _connectionString = new SqliteConnectionStringBuilder { DataSource = DatabasePath, Cache = SqliteCacheMode.Private, Pooling = false }.ToString();
-        EnsureSchema();
-        logger.LogInformation("[RaceToFinish] Viewing history database at {Path}", DatabasePath);
+        DatabasePath = Path.Combine(paths.DataPath, "race-to-finish", "history.db");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
+            _connectionString = new SqliteConnectionStringBuilder { DataSource = DatabasePath, Cache = SqliteCacheMode.Private, Pooling = false }.ToString();
+            try
+            {
+                EnsureSchema();
+            }
+            catch (SqliteException ex) when (ex.SqliteErrorCode is 11 or 26)
+            {
+                // 11 = SQLITE_CORRUPT, 26 = SQLITE_NOTADB. Keep the damaged file for recovery and start fresh.
+                string aside = DatabasePath + ".damaged-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+                File.Move(DatabasePath, aside);
+                logger.LogError(ex, "[RaceToFinish] History database was damaged; moved it to {Aside} and started a new one", aside);
+                EnsureSchema();
+            }
+
+            logger.LogInformation("[RaceToFinish] Viewing history database at {Path}", DatabasePath);
+        }
+        catch (Exception ex)
+        {
+            Error = "The viewing history database could not be opened (" + ex.GetBaseException().Message + "). Watch tracking is off until this is fixed.";
+            logger.LogError(ex, "[RaceToFinish] {Error}", Error);
+        }
     }
 
     /// <summary>Gets the database file path.</summary>
     public string DatabasePath { get; }
+
+    /// <summary>Gets why the database is unavailable, or null when it works.</summary>
+    public string? Error { get; }
 
     /// <summary>
     /// Gets when live tracking began (when this database was first created). Imports only bring in history
@@ -80,22 +106,104 @@ public sealed class HistoryDatabase
         }
     }
 
-    /// <summary>Adds a live session.</summary>
-    /// <param name="session">Session.</param>
+    /// <summary>
+    /// Saves a live session. If it continues an unfinished viewing of the same item by the same person (it starts
+    /// near where that one stopped, within <paramref name="resumeWindow"/>), the two become one viewing: the parts
+    /// seen are combined, so pausing, switching devices or a restarted stream never split a watch.
+    /// </summary>
+    /// <param name="session">The session; Segments, Covered, Percent and Finished are recomputed here.</param>
     /// <param name="item">What was watched.</param>
-    public void AddSession(SessionRecord session, ItemSnapshot? item)
+    /// <param name="resumeWindow">How long after the earlier session ended a continuation may start.</param>
+    /// <param name="resumeToleranceSeconds">How far from the earlier stop position the continuation may start.</param>
+    /// <param name="minimumSeconds">A brand-new session shorter than this is not kept.</param>
+    /// <param name="finishedShare">Share of the runtime that must be seen to count as finished.</param>
+    /// <returns>What happened.</returns>
+    public SaveOutcome SaveLiveSession(SessionRecord session, ItemSnapshot? item, TimeSpan resumeWindow, int resumeToleranceSeconds, int minimumSeconds, double finishedShare)
     {
         lock (_lock)
         {
             using var connection = Open();
             using var tx = connection.BeginTransaction();
+
+            SessionRecord? previous = null;
+            if (session.StartedUtc is DateTime started && session.StartPositionSeconds is int startPosition)
+            {
+                using var find = Command(
+                    connection,
+                    tx,
+                    "SELECT id, watched_seconds, segments, started_utc, device_name, client_name FROM sessions " +
+                    "WHERE user_id = $u AND item_id = $i AND source = 'live' AND finished = 0 AND ended_utc >= $since " +
+                    "AND ABS(COALESCE(position_seconds, 0) - $pos) <= $tol ORDER BY ended_utc DESC LIMIT 1",
+                    ("$u", session.UserId),
+                    ("$i", session.ItemId),
+                    ("$since", Iso(started - resumeWindow)),
+                    ("$pos", startPosition),
+                    ("$tol", resumeToleranceSeconds));
+                using var reader = find.ExecuteReader();
+                if (reader.Read())
+                {
+                    previous = new SessionRecord
+                    {
+                        Id = reader.GetInt64(0),
+                        WatchedSeconds = reader.GetInt32(1),
+                        Segments = reader.IsDBNull(2) ? [] : JsonSerializer.Deserialize<List<int[]>>(reader.GetString(2), Json) ?? [],
+                        StartedUtc = reader.IsDBNull(3) ? null : ParseIso(reader.GetString(3)),
+                        DeviceName = NullableString(reader, 4),
+                        ClientName = NullableString(reader, 5),
+                    };
+                }
+            }
+
+            if (previous is null && session.WatchedSeconds < minimumSeconds)
+            {
+                return SaveOutcome.Skipped;
+            }
+
+            if (previous is not null)
+            {
+                session.Id = previous.Id;
+                session.WatchedSeconds += previous.WatchedSeconds;
+                session.Segments = previous.Segments.Concat(session.Segments).ToList();
+                session.StartedUtc = previous.StartedUtc ?? session.StartedUtc;
+                session.StartPositionSeconds = null; // keep the original start position
+            }
+
+            session.Segments = Coverage.Merge(session.Segments);
+            session.CoveredSeconds = Coverage.Length(session.Segments);
+            double share = session.RuntimeSeconds is int runtime && runtime > 0 ? Math.Min(1.0, session.CoveredSeconds.Value / (double)runtime) : 0;
+            session.Percent = Math.Round(share, 4);
+            session.Finished = share >= finishedShare;
+
             if (item is not null)
             {
                 UpsertItem(connection, tx, item);
             }
 
-            InsertOrUpdateSession(connection, tx, session);
+            if (previous is null)
+            {
+                InsertOrUpdateSession(connection, tx, session);
+            }
+            else
+            {
+                Execute(
+                    connection,
+                    tx,
+                    "UPDATE sessions SET ended_utc = $end, watched_seconds = $watched, position_seconds = $pos, covered_seconds = $covered, " +
+                    "segments = $segments, percent = $pct, finished = $fin, device_name = $dev, client_name = $client WHERE id = $id",
+                    ("$end", session.EndedUtc is null ? null : Iso(session.EndedUtc.Value)),
+                    ("$watched", session.WatchedSeconds),
+                    ("$pos", session.PositionSeconds),
+                    ("$covered", session.CoveredSeconds),
+                    ("$segments", JsonSerializer.Serialize(session.Segments, Json)),
+                    ("$pct", session.Percent),
+                    ("$fin", session.Finished ? 1 : 0),
+                    ("$dev", session.DeviceName ?? previous.DeviceName),
+                    ("$client", session.ClientName ?? previous.ClientName),
+                    ("$id", previous.Id));
+            }
+
             tx.Commit();
+            return previous is null ? SaveOutcome.Added : SaveOutcome.Continued;
         }
     }
 
@@ -268,7 +376,8 @@ public sealed class HistoryDatabase
                 "SELECT s.id, s.user_id, s.item_id, s.source, s.started_utc, s.ended_utc, s.watched_seconds, s.position_seconds, " +
                 "s.runtime_seconds, s.percent, s.finished, s.play_count, s.device_name, s.client_name, s.import_key, " +
                 "i.item_type, i.title, i.series_id, i.series_title, i.season_number, i.episode_number, i.year, i.runtime_seconds, " +
-                "i.tmdb_id, i.imdb_id, i.series_tmdb_id, i.original_language, i.genres, i.studios, i.countries, i.directors, i.writers, i.cast_list " +
+                "i.tmdb_id, i.imdb_id, i.series_tmdb_id, i.original_language, i.genres, i.studios, i.countries, i.directors, i.writers, i.cast_list, " +
+                "s.start_position_seconds, s.covered_seconds, s.segments " +
                 "FROM sessions s LEFT JOIN items i ON i.item_id = s.item_id WHERE s.user_id = $u " +
                 "ORDER BY COALESCE(s.ended_utc, s.started_utc) DESC, s.id DESC" + (limit is null ? string.Empty : " LIMIT $l");
             using var command = limit is null
@@ -295,6 +404,9 @@ public sealed class HistoryDatabase
                     DeviceName = NullableString(reader, 12),
                     ClientName = NullableString(reader, 13),
                     ImportKey = NullableString(reader, 14),
+                    StartPositionSeconds = NullableInt(reader, 33),
+                    CoveredSeconds = NullableInt(reader, 34),
+                    Segments = FromJson<List<int[]>>(reader, 35) ?? [],
                 };
                 ItemSnapshot? item = reader.IsDBNull(15) ? null : new ItemSnapshot
                 {
@@ -384,6 +496,11 @@ public sealed class HistoryDatabase
 
     private SqliteConnection Open()
     {
+        if (Error is not null)
+        {
+            throw new InvalidOperationException(Error);
+        }
+
         var connection = new SqliteConnection(_connectionString);
         connection.Open();
         using var pragma = connection.CreateCommand();
@@ -449,8 +566,8 @@ public sealed class HistoryDatabase
 
     private static void InsertOrUpdateSession(SqliteConnection connection, SqliteTransaction? tx, SessionRecord s)
     {
-        const string Columns = "user_id, item_id, source, started_utc, ended_utc, watched_seconds, position_seconds, runtime_seconds, percent, finished, play_count, device_name, client_name, import_key";
-        const string Values = "$u, $i, $src, $start, $end, $watched, $pos, $runtime, $pct, $fin, $plays, $dev, $client, $key";
+        const string Columns = "user_id, item_id, source, started_utc, ended_utc, watched_seconds, position_seconds, runtime_seconds, percent, finished, play_count, device_name, client_name, import_key, start_position_seconds, covered_seconds, segments";
+        const string Values = "$u, $i, $src, $start, $end, $watched, $pos, $runtime, $pct, $fin, $plays, $dev, $client, $key, $startpos, $covered, $segments";
         string sql = s.ImportKey is null
             ? $"INSERT INTO sessions({Columns}) VALUES({Values})"
             : $"INSERT INTO sessions({Columns}) VALUES({Values}) ON CONFLICT(import_key) WHERE import_key IS NOT NULL DO UPDATE SET " +
@@ -474,7 +591,10 @@ public sealed class HistoryDatabase
             ("$plays", s.PlayCount),
             ("$dev", s.DeviceName),
             ("$client", s.ClientName),
-            ("$key", s.ImportKey));
+            ("$key", s.ImportKey),
+            ("$startpos", s.StartPositionSeconds),
+            ("$covered", s.CoveredSeconds),
+            ("$segments", s.Segments.Count == 0 ? null : JsonSerializer.Serialize(s.Segments, Json)));
     }
 
     private void EnsureSchema()
@@ -503,7 +623,9 @@ public sealed class HistoryDatabase
                 "CREATE TABLE IF NOT EXISTS sessions(" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, item_id TEXT NOT NULL, source TEXT NOT NULL, " +
                 "started_utc TEXT, ended_utc TEXT, watched_seconds INTEGER NOT NULL, position_seconds INTEGER, runtime_seconds INTEGER, " +
-                "percent REAL, finished INTEGER NOT NULL, play_count INTEGER, device_name TEXT, client_name TEXT, import_key TEXT)");
+                "percent REAL, finished INTEGER NOT NULL, play_count INTEGER, device_name TEXT, client_name TEXT, import_key TEXT, " +
+                "start_position_seconds INTEGER, covered_seconds INTEGER, segments TEXT)");
+            Execute(connection, tx, "CREATE INDEX IF NOT EXISTS sessions_resume ON sessions(user_id, item_id, source, finished, ended_utc)");
             Execute(connection, tx, "CREATE INDEX IF NOT EXISTS sessions_user_time ON sessions(user_id, started_utc)");
             Execute(connection, tx, "CREATE INDEX IF NOT EXISTS sessions_item ON sessions(item_id)");
             Execute(connection, tx, "CREATE UNIQUE INDEX IF NOT EXISTS sessions_import_key ON sessions(import_key) WHERE import_key IS NOT NULL");

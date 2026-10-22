@@ -74,6 +74,7 @@ public class HistoryController : ControllerBase
             shareWithAdmin = _database.GetShareWithAdmin(id),
             liveSessions = summary.LiveSessions,
             liveHours = Math.Round(summary.LiveSeconds / 3600.0, 1),
+            liveMinutes = (int)Math.Round(summary.LiveSeconds / 60.0),
             importedSessions = summary.ImportedSessions,
             firstUtc = summary.FirstUtc,
         };
@@ -191,6 +192,11 @@ public class HistoryController : ControllerBase
                     sessions = (int?)counts[id],
                 }))
             .ToList();
+
+        if (_database.Error is not null)
+        {
+            return new { error = _database.Error, users = Array.Empty<object>() };
+        }
 
         return new
         {

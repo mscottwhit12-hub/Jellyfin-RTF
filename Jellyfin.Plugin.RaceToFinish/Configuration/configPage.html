@@ -70,6 +70,7 @@
                         list.appendChild(line(status.injectionRegistered, status.injectionRegistered
                             ? 'Header button is active in the web client'
                             : (status.injectionError || 'Header button is not active yet. Restart Jellyfin.')));
+                        list.appendChild(line(!status.historyError, status.historyError || 'Viewing history is being recorded'));
                     });
                 }
 
@@ -84,6 +85,7 @@
 
                 function loadHistory() {
                     ApiClient.getJSON(ApiClient.getUrl('RaceToFinish/Admin/History')).then(function (data) {
+                        if (data.error) { document.querySelector('#RtfImportInfo').textContent = data.error; return; }
                         document.querySelector('#RtfImportInfo').textContent = importSummary(data.lastImportCounts, data.lastImportUtc);
                         var table = document.querySelector('#RtfUsers');
                         table.innerHTML = '<tr style="text-align:left;opacity:.7"><th style="padding:.4em 0">Person</th><th>Viewing history</th><th></th></tr>';

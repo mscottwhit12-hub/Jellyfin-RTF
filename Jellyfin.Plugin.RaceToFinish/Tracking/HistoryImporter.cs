@@ -242,9 +242,15 @@ public class HistoryImporter
                     continue;
                 }
 
-                // A stop: pair it with the start before it. The log has no pause or seek information, so the
+                // A stop without its start (the log was trimmed between them) says nothing about how long: skip it.
+                if (openStart is not DateTime start)
+                {
+                    continue;
+                }
+
+                // Pair the stop with the start before it. The log has no pause or seek information, so the
                 // time between start and stop is an upper bound on time watched, capped at the runtime.
-                TimeSpan span = openStart is DateTime start ? when - start : TimeSpan.Zero;
+                TimeSpan span = when - start;
                 if (runtimeTicks is long rt && span > TimeSpan.FromTicks(rt))
                 {
                     span = TimeSpan.FromTicks(rt);
@@ -257,7 +263,7 @@ public class HistoryImporter
                         UserId = ItemSnapshotBuilder.Id(group.Key.UserId),
                         ItemId = ItemSnapshotBuilder.Id(group.Key.ItemId),
                         Source = SessionSource.ImportedActivityLog,
-                        StartedUtc = openStart ?? when,
+                        StartedUtc = start,
                         EndedUtc = when,
                         WatchedSeconds = (int)span.TotalSeconds,
                         RuntimeSeconds = runtimeTicks is long t ? (int)TimeSpan.FromTicks(t).TotalSeconds : null,

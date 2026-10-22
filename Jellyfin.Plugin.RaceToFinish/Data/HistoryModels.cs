@@ -96,6 +96,19 @@ public sealed class ItemSnapshot
     public IReadOnlyList<CreditRecord> Cast { get; set; } = [];
 }
 
+/// <summary>What happened when a live session was saved.</summary>
+public enum SaveOutcome
+{
+    /// <summary>Stored as a new viewing.</summary>
+    Added,
+
+    /// <summary>Joined onto an unfinished viewing it continues (paused, switched device, stream restarted).</summary>
+    Continued,
+
+    /// <summary>Too short to keep, and not a continuation.</summary>
+    Skipped,
+}
+
 /// <summary>One viewing session.</summary>
 public sealed class SessionRecord
 {
@@ -120,16 +133,25 @@ public sealed class SessionRecord
     /// <summary>Gets or sets the seconds actually watched (skipped-over parts excluded).</summary>
     public int WatchedSeconds { get; set; }
 
-    /// <summary>Gets or sets the furthest position reached, in seconds.</summary>
+    /// <summary>Gets or sets where playback was when the session ended, in seconds.</summary>
     public int? PositionSeconds { get; set; }
+
+    /// <summary>Gets or sets where playback was when the session started, in seconds (resuming starts mid-way).</summary>
+    public int? StartPositionSeconds { get; set; }
+
+    /// <summary>Gets or sets the distinct seconds of the item seen (rewatched parts count once).</summary>
+    public int? CoveredSeconds { get; set; }
+
+    /// <summary>Gets or sets the parts seen, as merged [start, end] ranges in seconds.</summary>
+    public List<int[]> Segments { get; set; } = [];
 
     /// <summary>Gets or sets the runtime in seconds at the time of watching.</summary>
     public int? RuntimeSeconds { get; set; }
 
-    /// <summary>Gets or sets the share of the runtime actually watched, 0 to 1.</summary>
+    /// <summary>Gets or sets the share of the runtime seen, 0 to 1 (based on distinct parts seen).</summary>
     public double? Percent { get; set; }
 
-    /// <summary>Gets or sets a value indicating whether at least 85% was actually watched.</summary>
+    /// <summary>Gets or sets a value indicating whether at least 85% of the item has been seen.</summary>
     public bool Finished { get; set; }
 
     /// <summary>Gets or sets the play count, for user-data imports.</summary>

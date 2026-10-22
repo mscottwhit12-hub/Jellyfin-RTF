@@ -11,21 +11,31 @@ namespace Jellyfin.Plugin.RaceToFinish.Tracking;
 /// <summary>
 /// Records viewing sessions from Jellyfin's playback events.
 ///
-/// Only time actually watched is counted: each progress report adds the distance the playhead moved,
-/// but only if that distance is plausible for the real time that passed (allowing up to 2.5x playback
-/// speed). Jumps forward (seeking), jumps back and "mark as played" add nothing. A session is
-/// "finished" when at least 85% of the runtime was actually watched.
+/// Only real watching counts. Each report from the app adds the stretch the playhead moved, but only if real
+/// time can explain it (up to 2.5x playback speed); jumps forward (seeking), jumps back and "mark as played"
+/// add nothing. The stretches seen are kept as ranges, so rewatching a part never counts twice, and a viewing
+/// is "finished" once 85% of the item has been seen.
+///
+/// A viewing that is interrupted (a long pause, switching from the TV to the phone, the app restarting the
+/// stream after an audio or subtitle change) continues as the same viewing when the person picks it up again
+/// near where they stopped, within 12 hours.
 /// </summary>
 public sealed class WatchTracker : IHostedService, IDisposable
 {
-    /// <summary>Share of the runtime that must actually be watched for a session to count as finished.</summary>
+    /// <summary>Share of the item that must be seen for a viewing to count as finished.</summary>
     public const double FinishedShare = 0.85;
 
-    /// <summary>Sessions shorter than this are not saved (a peek, not a watch).</summary>
+    /// <summary>A brand-new viewing shorter than this is not saved (a peek, not a watch).</summary>
     public static readonly TimeSpan MinimumWatched = TimeSpan.FromSeconds(60);
 
-    /// <summary>A session with no reports for this long is treated as ended (app closed, TV turned off).</summary>
+    /// <summary>A session with no reports for this long is saved as it stands (app closed, TV off, long pause).</summary>
     public static readonly TimeSpan Abandoned = TimeSpan.FromMinutes(30);
+
+    /// <summary>How long after stopping someone can pick a viewing up again and have it continue.</summary>
+    public static readonly TimeSpan ResumeWindow = TimeSpan.FromHours(12);
+
+    /// <summary>How far from the stop position a continuation may start (resume points are approximate).</summary>
+    public const int ResumeToleranceSeconds = 180;
 
     private const double MaxSpeed = 2.5;
     private static readonly TimeSpan JitterAllowance = TimeSpan.FromSeconds(3);
@@ -56,6 +66,12 @@ public sealed class WatchTracker : IHostedService, IDisposable
     /// <inheritdoc />
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        if (_database.Error is not null)
+        {
+            _logger.LogError("[RaceToFinish] Watch tracker not started: {Error}", _database.Error);
+            return Task.CompletedTask;
+        }
+
         _sessionManager.PlaybackStart += OnPlaybackStart;
         _sessionManager.PlaybackProgress += OnPlaybackProgress;
         _sessionManager.PlaybackStopped += OnPlaybackStopped;
@@ -72,12 +88,12 @@ public sealed class WatchTracker : IHostedService, IDisposable
         _sessionManager.PlaybackStopped -= OnPlaybackStopped;
         _sweeper?.Change(Timeout.Infinite, Timeout.Infinite);
 
-        // Server shutting down: save what has been watched so far.
+        // Server shutting down: save what has been watched so far. It continues after the restart.
         foreach (string key in _active.Keys.ToList())
         {
             if (_active.TryRemove(key, out WatchState? state))
             {
-                Save(state, state.LastReportUtc);
+                Guard(() => Save(state, state.LastReportUtc));
             }
         }
 
@@ -137,18 +153,37 @@ public sealed class WatchTracker : IHostedService, IDisposable
                 continue;
             }
 
-            string key = $"{sessionKey}|{user.Id:N}|{item!.Id:N}";
-            WatchState state = _active.GetOrAdd(key, _ => new WatchState
+            string personItem = $"|{user.Id:N}|{item!.Id:N}";
+            string key = sessionKey + personItem;
+            bool created = false;
+            WatchState state = _active.GetOrAdd(key, _ =>
             {
-                UserId = ItemSnapshotBuilder.Id(user.Id),
-                Item = item,
-                StartedUtc = now,
-                LastReportUtc = now,
-                LastPositionTicks = position ?? 0,
-                MaxPositionTicks = position ?? 0,
-                DeviceName = e.DeviceName ?? e.Session?.DeviceName,
-                ClientName = e.ClientName ?? e.Session?.Client,
+                created = true;
+                return new WatchState
+                {
+                    UserId = ItemSnapshotBuilder.Id(user.Id),
+                    Item = item,
+                    StartedUtc = now,
+                    LastReportUtc = now,
+                    StartPositionTicks = position ?? 0,
+                    LastPositionTicks = position ?? 0,
+                    DeviceName = e.DeviceName ?? e.Session?.DeviceName,
+                    ClientName = e.ClientName ?? e.Session?.Client,
+                };
             });
+
+            if (created)
+            {
+                // The same person started the same item on another stream (another device, or the app restarted
+                // the stream). Save the old one now so this one can continue it.
+                foreach (string other in _active.Keys.Where(k => k != key && k.EndsWith(personItem, StringComparison.Ordinal)).ToList())
+                {
+                    if (_active.TryRemove(other, out WatchState? previous))
+                    {
+                        Save(previous, previous.LastReportUtc);
+                    }
+                }
+            }
 
             lock (state)
             {
@@ -173,14 +208,16 @@ public sealed class WatchTracker : IHostedService, IDisposable
             if (moved > TimeSpan.Zero && moved <= (wall * MaxSpeed) + JitterAllowance)
             {
                 state.WatchedTicks += moved.Ticks;
+                state.Segments.Add([Seconds(state.LastPositionTicks), Seconds(position)]);
             }
 
             state.LastPositionTicks = position;
-            state.MaxPositionTicks = Math.Max(state.MaxPositionTicks, position);
         }
 
         state.LastReportUtc = now;
     }
+
+    private static int Seconds(long ticks) => (int)Math.Round(TimeSpan.FromTicks(ticks).TotalSeconds);
 
     private void SweepAbandoned()
     {
@@ -196,38 +233,56 @@ public sealed class WatchTracker : IHostedService, IDisposable
 
     private void Save(WatchState state, DateTime endedUtc)
     {
-        TimeSpan watched = TimeSpan.FromTicks(state.WatchedTicks);
-        if (watched < MinimumWatched)
+        SessionRecord session;
+        lock (state)
+        {
+            session = Snapshot(state, endedUtc);
+        }
+
+        // Skip the database entirely for a brief peek that nothing could continue.
+        if (session.WatchedSeconds == 0)
         {
             return;
         }
 
-        long runtimeTicks = state.Item.RunTimeTicks ?? 0;
-        double share = runtimeTicks > 0 ? Math.Min(1.0, state.WatchedTicks / (double)runtimeTicks) : 0;
+        SaveOutcome outcome = _database.SaveLiveSession(
+            session,
+            _snapshots.Build(state.Item),
+            ResumeWindow,
+            ResumeToleranceSeconds,
+            (int)MinimumWatched.TotalSeconds,
+            FinishedShare);
 
-        var session = new SessionRecord
+        if (outcome != SaveOutcome.Skipped)
+        {
+            _logger.LogInformation(
+                "[RaceToFinish] {Outcome} viewing of {Title}: {Minutes:0.0} min watched, {Percent:P0} seen{Finished}",
+                outcome == SaveOutcome.Continued ? "Continued" : "Recorded",
+                state.Item.Name,
+                session.WatchedSeconds / 60.0,
+                session.Percent ?? 0,
+                session.Finished ? ", finished" : string.Empty);
+        }
+    }
+
+    private static SessionRecord Snapshot(WatchState state, DateTime endedUtc)
+    {
+        long runtimeTicks = state.Item.RunTimeTicks ?? 0;
+        return new SessionRecord
         {
             UserId = state.UserId,
             ItemId = ItemSnapshotBuilder.Id(state.Item.Id),
             Source = SessionSource.Live,
             StartedUtc = state.StartedUtc,
             EndedUtc = endedUtc,
-            WatchedSeconds = (int)watched.TotalSeconds,
-            PositionSeconds = (int)TimeSpan.FromTicks(state.MaxPositionTicks).TotalSeconds,
-            RuntimeSeconds = runtimeTicks > 0 ? (int)TimeSpan.FromTicks(runtimeTicks).TotalSeconds : null,
-            Percent = Math.Round(share, 4),
-            Finished = share >= FinishedShare,
+            WatchedSeconds = (int)TimeSpan.FromTicks(state.WatchedTicks).TotalSeconds,
+            StartPositionSeconds = Seconds(state.StartPositionTicks),
+            PositionSeconds = Seconds(state.LastPositionTicks),
+            RuntimeSeconds = runtimeTicks > 0 ? Seconds(runtimeTicks) : null,
+            Segments = state.Segments.ToList(),
             DeviceName = state.DeviceName,
             ClientName = state.ClientName,
         };
-
-        _database.AddSession(session, _snapshots.Build(state.Item));
-        _logger.LogInformation(
-            "[RaceToFinish] Recorded {Minutes:0.0} min of {Title} ({Percent:P0}{Finished})",
-            watched.TotalMinutes,
-            state.Item.Name,
-            share,
-            session.Finished ? ", finished" : string.Empty);
     }
 
     private sealed class WatchState
@@ -240,11 +295,13 @@ public sealed class WatchTracker : IHostedService, IDisposable
 
         public DateTime LastReportUtc { get; set; }
 
+        public long StartPositionTicks { get; set; }
+
         public long LastPositionTicks { get; set; }
 
-        public long MaxPositionTicks { get; set; }
-
         public long WatchedTicks { get; set; }
+
+        public List<int[]> Segments { get; } = [];
 
         public string? DeviceName { get; set; }
 

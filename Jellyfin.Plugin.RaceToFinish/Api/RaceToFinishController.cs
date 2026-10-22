@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using System.Reflection;
+using Jellyfin.Plugin.RaceToFinish.Data;
 using Jellyfin.Plugin.RaceToFinish.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -14,6 +15,15 @@ namespace Jellyfin.Plugin.RaceToFinish.Api;
 [Route("RaceToFinish")]
 public class RaceToFinishController : ControllerBase
 {
+    private readonly HistoryDatabase _database;
+
+    /// <summary>Initializes a new instance of the <see cref="RaceToFinishController"/> class.</summary>
+    /// <param name="database">History database.</param>
+    public RaceToFinishController(HistoryDatabase database)
+    {
+        _database = database;
+    }
+
     private static readonly Dictionary<string, string> WebAssets = new(StringComparer.Ordinal)
     {
         ["rtf.js"] = "application/javascript; charset=utf-8",
@@ -72,6 +82,7 @@ public class RaceToFinishController : ControllerBase
         {
             injectionRegistered = StartupTask.InjectionRegistered,
             injectionError = StartupTask.InjectionError,
+            historyError = _database.Error,
             version = typeof(RaceToFinishController).Assembly.GetName().Version?.ToString(),
         };
     }
