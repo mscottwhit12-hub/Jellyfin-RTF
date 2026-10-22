@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.2.0.0",
+        "changelog": "Viewing history. Records what each person watches (time actually watched, parts seen, device, cast, director, studio, genres), counts a movie or episode as finished at 85% seen, and keeps an interrupted viewing together when picked up again within 12 hours. Imports history from before install (Jellyfin watch data, activity log, Playback Reporting) without ever counting it toward races. New My Activity tab: private by default, optional sharing with the admin, download and delete your data. Admin page: re-run import, remove data of deleted accounts.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/mscottwhit12-hub/Jellyfin-RTF/releases/download/v0.2.0/race-to-finish_0.2.0.0.zip",
+        "checksum": "1d6e1d4bd1aad2d8776bd4d78508f8be",
+        "timestamp": "2026-10-22T23:07:08Z"
+      },
+      {
         "version": "0.1.2.0",
         "changelog": "Fixes the trophy button not showing on Jellyfin 12: it now sits in the visible top bar next to SyncPlay, Cast and Search. If no header is visible, a floating button appears instead (hidden during video playback).",
         "targetAbi": "12.0.0.0",
