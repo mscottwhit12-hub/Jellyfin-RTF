@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 REPO = os.environ.get("GITHUB_REPOSITORY", "mscottwhit12-hub/Jellyfin-RTF")
 version = os.environ["VERSION"]
 zip_name = os.environ["ZIP"]
-tag = os.environ.get("GITHUB_REF_NAME", "v" + version.rsplit(".", 1)[0])
+tag = os.environ.get("TAG") or "v" + version.rsplit(".", 1)[0]
 
 with open("manifest.json", encoding="utf-8") as f:
     manifest = json.load(f)

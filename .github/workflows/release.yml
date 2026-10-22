@@ -1,9 +1,18 @@
 name: Release
 
-# Push a tag like v0.1.0 to publish. This builds the plugin, makes a GitHub
-# Release with the zip, and adds the version to manifest.json so Jellyfin
-# offers it as an install or update.
+# Publish a version: GitHub → Actions → Release → Run workflow, enter the
+# version (e.g. 0.1.0) and what changed. Pushing a tag like v0.1.0 works too.
+# This builds the plugin, makes a GitHub Release with the zip, and adds the
+# version to manifest.json so Jellyfin offers it as an install or update.
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, like 0.1.0'
+        required: true
+      notes:
+        description: 'What changed (shown in Jellyfin)'
+        required: true
   push:
     tags: ['v*.*.*']
 
@@ -23,13 +32,24 @@ jobs:
 
       - name: Work out version
         id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_NOTES: ${{ inputs.notes }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${INPUT_VERSION#v}"
+            NOTES="$INPUT_NOTES"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            NOTES="$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | sed '/-----BEGIN PGP/,$d')"
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Version must look like 1.2.3, got '$VERSION'"; exit 1
+          fi
+          [ -z "$NOTES" ] && NOTES="Release $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "full=$VERSION.0" >> "$GITHUB_OUTPUT"
-          NOTES="$(git tag -l --format='%(contents)' "$TAG" | sed '/-----BEGIN PGP/,$d')"
-          [ -z "$NOTES" ] && NOTES="Release $VERSION"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           { echo 'notes<<NOTES_EOF'; echo "$NOTES"; echo 'NOTES_EOF'; } >> "$GITHUB_OUTPUT"
 
       - name: Build
@@ -48,14 +68,17 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ steps.v.outputs.notes }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" "${{ steps.pkg.outputs.zip }}" \
+          gh release create "${{ steps.v.outputs.tag }}" "${{ steps.pkg.outputs.zip }}" \
+            --target "${GITHUB_SHA}" \
             --title "Race to Finish ${{ steps.v.outputs.version }}" \
-            --notes "${{ steps.v.outputs.notes }}"
+            --notes "$NOTES"
 
       - name: Add version to manifest.json
         env:
           VERSION: ${{ steps.v.outputs.full }}
+          TAG: ${{ steps.v.outputs.tag }}
           ZIP: ${{ steps.pkg.outputs.zip }}
           MD5: ${{ steps.pkg.outputs.md5 }}
           NOTES: ${{ steps.v.outputs.notes }}
