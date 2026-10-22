@@ -54,8 +54,38 @@
   }
 
   // ---------- Header button ----------
+  function isVisible(el) {
+    if (!el) { return false; }
+    var rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 && window.getComputedStyle(el).visibility !== 'hidden';
+  }
+
+  // Where the button goes, in order of preference. Only a header that is actually on screen counts:
+  // Jellyfin 12's modern layout keeps the old header in the page but hidden, which is what hid the
+  // button in v0.1.0.
   function findHeaderSlot() {
-    return document.querySelector('.skinHeader .headerRight') || document.querySelector('.headerRight');
+    // Jellyfin 12 modern layout: the MUI toolbar group holding SyncPlay, Cast and Search.
+    // Matched by aria-controls/href, which do not change with the interface language.
+    var anchor = document.querySelector(
+      '.MuiToolbar-root [aria-controls="app-remote-play-menu"], ' +
+      '.MuiToolbar-root [aria-controls="app-sync-play-menu"], ' +
+      '.MuiToolbar-root a[href$="#/search"], .MuiToolbar-root a[href*="/search"]');
+    if (anchor && isVisible(anchor.parentElement)) { return anchor.parentElement; }
+
+    // Legacy layouts (desktop-legacy, mobile-legacy, TV).
+    var legacy = document.querySelector('.skinHeader .headerRight');
+    if (isVisible(legacy)) { return legacy; }
+
+    // Last resort in the modern layout: next to the avatar button.
+    var avatarButton = document.querySelector('.MuiToolbar-root button[aria-controls="app-user-menu"]');
+    if (avatarButton && isVisible(avatarButton.parentElement)) { return avatarButton.parentElement; }
+
+    return null;
+  }
+
+  // The header is hidden while a video plays; a floating button must not sit on top of the picture.
+  function isPlayingVideo() {
+    return location.hash.indexOf('/video') !== -1 || !!document.querySelector('.videoPlayerContainer');
   }
 
   function makeButton(floating) {
@@ -94,12 +124,24 @@
         return;
       }
 
-      // No header found (theme or Jellyfin layout change). Wait a moment, then use a floating button
-      // so the plugin is always reachable.
+      var floating = current && current.classList.contains('rtf-floatbtn');
+      if (isPlayingVideo()) {
+        if (floating) { current.parentNode.removeChild(current); }
+        return;
+      }
+
+      // A button left in a header that is no longer shown is useless; the floating one replaces it.
+      if (current && !floating && !isVisible(current)) {
+        current.parentNode.removeChild(current);
+        current = null;
+      }
+
+      // No visible header (theme or Jellyfin layout change). Wait a moment, then use a floating
+      // button so the plugin is always reachable.
       if (!current && !floatTimer) {
         floatTimer = setTimeout(function () {
           floatTimer = null;
-          if (!findHeaderSlot() && !document.querySelector('.rtf-headerbtn')) {
+          if (!findHeaderSlot() && !isPlayingVideo() && !document.querySelector('.rtf-headerbtn')) {
             document.body.appendChild(makeButton(true));
           }
         }, 4000);

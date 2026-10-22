@@ -46,6 +46,15 @@ jobs:
           if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "Version must look like 1.2.3, got '$VERSION'"; exit 1
           fi
+          # Guard: the code being built must declare this version, so a release can never
+          # ship older code under a newer number.
+          CODE_VERSION="$(grep -oP '(?<=<Version>)[^<]+' Jellyfin.Plugin.RaceToFinish/Jellyfin.Plugin.RaceToFinish.csproj)"
+          if [ "$CODE_VERSION" != "$VERSION" ]; then
+            echo "Version mismatch: you asked for $VERSION but the code on this branch is $CODE_VERSION. Push the version bump first."; exit 1
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && git ls-remote --exit-code --tags origin "v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION was already released. Use a new version number."; exit 1
+          fi
           [ -z "$NOTES" ] && NOTES="Release $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "full=$VERSION.0" >> "$GITHUB_OUTPUT"
