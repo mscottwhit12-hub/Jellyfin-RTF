@@ -1,0 +1,11 @@
+[
+  {
+    "guid": "ebfd0ca6-bc98-4ca3-89a4-1febf058541d",
+    "name": "Race to Finish",
+    "description": "Family watch-list races for Jellyfin. The admin picks a collection, everyone races to watch it all, and the first three finishers win titles shown on their profile. Also supports request challenges through Seerr.",
+    "overview": "Family watch-list races: first to finish wins a title.",
+    "owner": "mscottwhit12-hub",
+    "category": "General",
+    "versions": []
+  }
+]

@@ -1,0 +1,70 @@
+name: Release
+
+# Push a tag like v0.1.0 to publish. This builds the plugin, makes a GitHub
+# Release with the zip, and adds the version to manifest.json so Jellyfin
+# offers it as an install or update.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Work out version
+        id: v
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "full=$VERSION.0" >> "$GITHUB_OUTPUT"
+          NOTES="$(git tag -l --format='%(contents)' "$TAG" | sed '/-----BEGIN PGP/,$d')"
+          [ -z "$NOTES" ] && NOTES="Release $VERSION"
+          { echo 'notes<<NOTES_EOF'; echo "$NOTES"; echo 'NOTES_EOF'; } >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          node --check Jellyfin.Plugin.RaceToFinish/Web/rtf.js
+          dotnet publish Jellyfin.Plugin.RaceToFinish/Jellyfin.Plugin.RaceToFinish.csproj -c Release -o out -p:Version=${{ steps.v.outputs.version }}
+
+      - name: Package
+        id: pkg
+        run: |
+          ZIP="race-to-finish_${{ steps.v.outputs.full }}.zip"
+          (cd out && zip -j "../$ZIP" Jellyfin.Plugin.RaceToFinish.dll)
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "md5=$(md5sum "$ZIP" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" "${{ steps.pkg.outputs.zip }}" \
+            --title "Race to Finish ${{ steps.v.outputs.version }}" \
+            --notes "${{ steps.v.outputs.notes }}"
+
+      - name: Add version to manifest.json
+        env:
+          VERSION: ${{ steps.v.outputs.full }}
+          ZIP: ${{ steps.pkg.outputs.zip }}
+          MD5: ${{ steps.pkg.outputs.md5 }}
+          NOTES: ${{ steps.v.outputs.notes }}
+        run: |
+          git fetch origin main
+          git checkout main
+          python3 build/update_manifest.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "manifest: add $VERSION"
+          git push origin main

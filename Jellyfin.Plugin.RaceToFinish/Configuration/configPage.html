@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Race to Finish</title>
+</head>
+<body>
+    <div id="RtfConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <h2 class="sectionTitle">Race to Finish</h2>
+                <p>Version <span id="RtfVersion">…</span>. This is a test build: the button and popup work, and challenges arrive in the next versions.</p>
+
+                <h3 class="sectionTitle">Setup check</h3>
+                <ul id="RtfChecks" style="list-style:none;padding:0;line-height:2"></ul>
+
+                <form id="RtfConfigForm">
+                    <h3 class="sectionTitle">Look</h3>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="RtfUseBlur" type="checkbox" is="emby-checkbox" />
+                            <span>Frosted-glass blur behind the popup</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Turn off if the popup feels slow on a TV. A solid dark panel is used instead.</div>
+                    </div>
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Save</span></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script type="text/javascript">
+            (function () {
+                var pluginId = 'ebfd0ca6-bc98-4ca3-89a4-1febf058541d';
+                var page = document.querySelector('#RtfConfigPage');
+
+                function line(ok, text) {
+                    var li = document.createElement('li');
+                    li.textContent = (ok ? '✔ ' : '✖ ') + text;
+                    li.style.color = ok ? '#4ADE80' : '#FDBA74';
+                    return li;
+                }
+
+                function runChecks() {
+                    var list = document.querySelector('#RtfChecks');
+                    list.innerHTML = '';
+                    ApiClient.getInstalledPlugins().then(function (plugins) {
+                        function has(fragment) {
+                            return plugins.some(function (p) { return (p.Name || '').toLowerCase().indexOf(fragment) !== -1; });
+                        }
+                        list.appendChild(line(has('file transformation'), has('file transformation')
+                            ? 'File Transformation is installed'
+                            : 'File Transformation is missing. Install it from the catalog, then restart Jellyfin.'));
+                        list.appendChild(line(has('home screen sections') || has('home sections'), (has('home screen sections') || has('home sections'))
+                            ? 'Home Screen Sections is installed'
+                            : 'Home Screen Sections is missing. It is needed for the home screen row in a later version.'));
+                    });
+                    ApiClient.getJSON(ApiClient.getUrl('RaceToFinish/Status')).then(function (status) {
+                        document.querySelector('#RtfVersion').textContent = status.version || '?';
+                        list.appendChild(line(status.injectionRegistered, status.injectionRegistered
+                            ? 'Header button is active in the web client'
+                            : (status.injectionError || 'Header button is not active yet. Restart Jellyfin.')));
+                    });
+                }
+
+                page.addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    runChecks();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        document.querySelector('#RtfUseBlur').checked = config.UseBlur !== false;
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+                document.querySelector('#RtfConfigForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.UseBlur = document.querySelector('#RtfUseBlur').checked;
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+                    return false;
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>
