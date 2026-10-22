@@ -12,7 +12,7 @@
     <!-- One version number for everything. The release workflow passes
          -p:Version=X.Y.Z from the git tag. Jellyfin compares the assembly
          version with the manifest entry, so both must read X.Y.Z.0. -->
-    <Version>0.1.2</Version>
+    <Version>0.2.0</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
   </PropertyGroup>
@@ -23,6 +23,11 @@
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
     <PackageReference Include="Jellyfin.Model" Version="12.0.0">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <!-- SQLite for viewing history. Jellyfin 12 already ships this library (it uses it for its
+         own database), so the plugin borrows the server's copy instead of bundling one. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>

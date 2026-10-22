@@ -177,7 +177,8 @@
   var TABS = [
     { id: 'challenges', label: 'Challenges' },
     { id: 'hall', label: '<span class="rtf-long">Hall of Champions</span><span class="rtf-short">Champions</span>' },
-    { id: 'profiles', label: 'Profiles' }
+    { id: 'profiles', label: 'Profiles' },
+    { id: 'activity', label: '<span class="rtf-long">My Activity</span><span class="rtf-short">Mine</span>' }
   ];
 
   function shell() {
@@ -207,10 +208,145 @@
     } else if (state.tab === 'hall') {
       body.innerHTML = '<h1 class="rtf-h1">Hall of Champions</h1>' +
         emptyState('No champions yet', 'Finished races and their winners are kept here for good.');
-    } else {
+    } else if (state.tab === 'profiles') {
       body.innerHTML = '<h1 class="rtf-h1">Profiles</h1><div class="rtf-sub">Everyone shown on the login screen can play.</div><div class="rtf-people" data-people></div>';
       renderPeople(body.querySelector('[data-people]'));
+    } else {
+      renderActivity(body);
     }
+  }
+
+  // ---------- My Activity (private to the signed-in user) ----------
+  // A plain check that watches are being recorded. The real stats page comes later.
+  function authHeader() {
+    var client = api();
+    var token = client && client.accessToken ? client.accessToken() : '';
+    return 'MediaBrowser Client="Race to Finish", Device="Web", DeviceId="rtf-web", Version="1", Token="' + token + '"';
+  }
+
+  function apiFetch(method, path, body) {
+    var client = api();
+    var options = { method: method, headers: { 'Authorization': authHeader(), 'X-Emby-Token': client.accessToken() } };
+    if (body !== undefined) {
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(body);
+    }
+    return fetch(client.getUrl(path), options).then(function (response) {
+      if (!response.ok) { throw new Error('HTTP ' + response.status); }
+      var type = response.headers.get('content-type') || '';
+      return type.indexOf('json') !== -1 ? response.json() : response.blob();
+    });
+  }
+
+  function formatWhen(iso) {
+    if (!iso) { return 'Date unknown'; }
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) { return 'Date unknown'; }
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' +
+      d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function itemLabel(row) {
+    if (row.type === 'Episode' && row.seriesTitle) {
+      var code = (row.season != null ? 'S' + row.season : '') + (row.episode != null ? 'E' + row.episode : '');
+      return { main: row.seriesTitle, sub: (code ? code + ' · ' : '') + row.title };
+    }
+    return { main: row.title, sub: row.year ? String(row.year) : 'Movie' };
+  }
+
+  function activityRow(row) {
+    var label = itemLabel(row);
+    var imported = row.source && row.source !== 'live';
+    var status = row.finished
+      ? '<span class="rtf-chip rtf-chip-done">Finished</span>'
+      : '<span class="rtf-chip">' + Math.round((row.percent || 0) * 100) + '% watched</span>';
+    var source = imported ? '<span class="rtf-chip rtf-chip-old">Imported</span>' : '';
+    var detail = imported && row.source === 'imported-userdata'
+      ? 'From Jellyfin\'s watch history' + (row.playCount > 1 ? ' · played ' + row.playCount + ' times' : '')
+      : Math.round(row.watchedMinutes) + ' min' + (row.device ? ' · ' + esc(row.device) : '');
+    return '<li class="rtf-act">' +
+      '<span class="rtf-act-text"><span class="rtf-act-title">' + esc(label.main) + '</span>' +
+      '<span class="rtf-act-sub">' + esc(label.sub) + '</span></span>' +
+      '<span class="rtf-act-when">' + esc(formatWhen(row.endedUtc || row.startedUtc)) + '<br><span class="rtf-act-sub">' + detail + '</span></span>' +
+      '<span class="rtf-act-chips">' + status + source + '</span></li>';
+  }
+
+  function renderActivity(body) {
+    body.innerHTML = '<h1 class="rtf-h1">My Activity</h1><div class="rtf-sub">Only you can see this page.</div><div class="rtf-activity" data-activity><div class="rtf-sub">Loading…</div></div>';
+    var target = body.querySelector('[data-activity]');
+    Promise.all([apiFetch('GET', 'RaceToFinish/Me'), apiFetch('GET', 'RaceToFinish/Me/Activity?limit=25')]).then(function (results) {
+      if (!state.open || state.tab !== 'activity') { return; }
+      var me = results[0], rows = results[1] || [];
+      var list = rows.length
+        ? '<ul class="rtf-acts">' + rows.map(activityRow).join('') + '</ul>'
+        : emptyState('Nothing recorded yet', 'Watch something for at least a minute and it shows up here.');
+      target.innerHTML =
+        '<div class="rtf-stats">' +
+          stat(me.liveHours, 'hours recorded') +
+          stat(me.liveSessions, 'watches recorded') +
+          stat(me.importedSessions, 'imported from before') +
+        '</div>' +
+        '<div class="rtf-card rtf-privacy">' +
+          '<span class="rtf-privacy-text"><span class="rtf-card-title">Share my viewing stats with the server admin</span>' +
+          '<span class="rtf-act-sub">Off by default. When on, the admin can see this activity. Race standings are always visible to everyone, but only for that race\'s movies. ' +
+          'Note: whoever runs the server can technically read the raw data files.</span></span>' +
+          '<button type="button" role="switch" class="rtf-switch" data-share aria-checked="' + (me.shareWithAdmin ? 'true' : 'false') + '" aria-label="Share my viewing stats with the server admin"><span></span></button>' +
+        '</div>' +
+        '<h2 class="rtf-h2">Recent</h2>' + list +
+        '<div class="rtf-actions">' +
+          '<button type="button" class="rtf-btn" data-export>Download my data</button>' +
+          '<button type="button" class="rtf-btn rtf-btn-danger" data-delete>Delete my viewing data</button>' +
+          '<span class="rtf-act-sub rtf-delete-note">Deleting removes everything recorded and imported about you, and stops older history being imported again.</span>' +
+        '</div>';
+      wireActivity(target);
+    }, function () {
+      target.innerHTML = emptyState('Could not load your activity', 'Try again in a moment. If it keeps happening, ask your admin to check the plugin is up to date.');
+    });
+  }
+
+  function stat(value, label) {
+    return '<div class="rtf-stat"><span class="rtf-stat-value">' + esc(value) + '</span><span class="rtf-stat-label">' + esc(label) + '</span></div>';
+  }
+
+  function wireActivity(target) {
+    var share = target.querySelector('[data-share]');
+    share.addEventListener('click', function () {
+      var next = share.getAttribute('aria-checked') !== 'true';
+      share.disabled = true;
+      apiFetch('PUT', 'RaceToFinish/Me/Privacy', { shareWithAdmin: next }).then(function (r) {
+        share.setAttribute('aria-checked', r.shareWithAdmin ? 'true' : 'false');
+      }).then(function () { share.disabled = false; }, function () { share.disabled = false; });
+    });
+
+    target.querySelector('[data-export]').addEventListener('click', function () {
+      apiFetch('GET', 'RaceToFinish/Me/Export').then(function (data) {
+        var blob = data instanceof Blob ? data : new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        var link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'race-to-finish-my-data.json';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(function () { URL.revokeObjectURL(link.href); link.parentNode.removeChild(link); }, 1000);
+      });
+    });
+
+    // Two presses to delete, no browser dialog (dialogs don't work well on TVs).
+    var del = target.querySelector('[data-delete]');
+    del.addEventListener('click', function () {
+      if (!del.getAttribute('data-armed')) {
+        del.setAttribute('data-armed', '1');
+        del.textContent = 'Press again to delete everything';
+        setTimeout(function () {
+          if (del.getAttribute('data-armed')) { del.removeAttribute('data-armed'); del.textContent = 'Delete my viewing data'; }
+        }, 5000);
+        return;
+      }
+      del.disabled = true;
+      apiFetch('DELETE', 'RaceToFinish/Me/Data').then(function () {
+        var root = document.querySelector('.rtf-root');
+        if (root) { renderBody(root); }
+      });
+    });
   }
 
   function renderPeople(container) {

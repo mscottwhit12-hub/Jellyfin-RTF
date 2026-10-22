@@ -9,10 +9,20 @@
         <div data-role="content">
             <div class="content-primary">
                 <h2 class="sectionTitle">Race to Finish</h2>
-                <p>Version <span id="RtfVersion">…</span>. This is a test build: the button and popup work, and challenges arrive in the next versions.</p>
+                <p>Version <span id="RtfVersion">…</span>. Test build: viewing history is being recorded. Challenges arrive in the next versions.</p>
 
                 <h3 class="sectionTitle">Setup check</h3>
                 <ul id="RtfChecks" style="list-style:none;padding:0;line-height:2"></ul>
+
+                <h3 class="sectionTitle">Viewing history</h3>
+                <p>Race to Finish records what each person watches, for races and their own stats. Each person's history is private to them.
+                You only see someone's history if they turn on sharing in their <b>My Activity</b> tab.</p>
+                <p id="RtfImportInfo">…</p>
+                <button is="emby-button" type="button" id="RtfImportBtn" class="raised emby-button"><span>Import existing history</span></button>
+                <div class="fieldDescription">Brings in what Jellyfin already knows: each person's watched items, the activity log
+                (kept 30 days by default, see Dashboard → Logs), and the Playback Reporting plugin if installed.
+                Safe to run again. Imported history never counts toward races.</div>
+                <table id="RtfUsers" style="width:100%;margin:1.5em 0;border-collapse:collapse"></table>
 
                 <form id="RtfConfigForm">
                     <h3 class="sectionTitle">Look</h3>
@@ -63,7 +73,56 @@
                     });
                 }
 
+                function text(value) { var span = document.createElement('span'); span.textContent = value; return span.innerHTML; }
+
+                function importSummary(counts, when) {
+                    if (!when) { return 'History has not been imported yet. It runs by itself shortly after the first start, or press the button.'; }
+                    var parts = (counts || '0|0|0').split('|');
+                    return 'Last import: ' + new Date(when).toLocaleString() + ' (' + parts[0] + ' from watch data, ' +
+                        parts[1] + ' from the activity log, ' + parts[2] + ' from Playback Reporting).';
+                }
+
+                function loadHistory() {
+                    ApiClient.getJSON(ApiClient.getUrl('RaceToFinish/Admin/History')).then(function (data) {
+                        document.querySelector('#RtfImportInfo').textContent = importSummary(data.lastImportCounts, data.lastImportUtc);
+                        var table = document.querySelector('#RtfUsers');
+                        table.innerHTML = '<tr style="text-align:left;opacity:.7"><th style="padding:.4em 0">Person</th><th>Viewing history</th><th></th></tr>';
+                        data.users.forEach(function (u) {
+                            var status;
+                            if (!u.exists) { status = 'Deleted account · ' + u.sessions + ' sessions left over'; }
+                            else if (!u.participant) { status = 'Hidden from the login screen · not tracked'; }
+                            else if (u.sharing) { status = 'Shared with you · ' + (u.sessions || 0) + ' sessions'; }
+                            else { status = 'Private'; }
+                            var row = document.createElement('tr');
+                            row.innerHTML = '<td style="padding:.4em 0">' + text(u.name) + '</td><td>' + text(status) + '</td><td style="text-align:right"></td>';
+                            if (!u.exists) {
+                                var btn = document.createElement('button');
+                                btn.setAttribute('is', 'emby-button');
+                                btn.className = 'raised emby-button';
+                                btn.textContent = 'Remove data';
+                                btn.addEventListener('click', function () {
+                                    ApiClient.ajax({ type: 'DELETE', url: ApiClient.getUrl('RaceToFinish/Admin/History/' + u.userId) }).then(loadHistory);
+                                });
+                                row.lastChild.appendChild(btn);
+                            }
+                            table.appendChild(row);
+                        });
+                    });
+                }
+
+                document.querySelector('#RtfImportBtn').addEventListener('click', function () {
+                    var info = document.querySelector('#RtfImportInfo');
+                    info.textContent = 'Importing…';
+                    ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('RaceToFinish/Admin/Import'), dataType: 'json' }).then(function (r) {
+                        info.textContent = 'Imported ' + r.userData + ' from watch data, ' + r.activityLog + ' from the activity log, ' +
+                            r.playbackReporting + ' from Playback Reporting' + (r.playbackReportingFound ? '' : ' (not installed)') + '.' +
+                            (r.notes && r.notes.length ? ' ' + r.notes.join(' ') : '');
+                        loadHistory();
+                    }, function () { info.textContent = 'Import failed. Check the server log for [RaceToFinish].'; });
+                });
+
                 page.addEventListener('pageshow', function () {
+                    loadHistory();
                     Dashboard.showLoadingMsg();
                     runChecks();
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {

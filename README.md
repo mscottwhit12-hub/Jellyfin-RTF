@@ -2,7 +2,7 @@
 
 Family watch-list races. An admin picks a collection, everyone races to watch all of it, and the first three to finish win titles that show on their profile.
 
-> **Status: v0.1 test build.** The header button and popup work. Challenges, standings, titles and Seerr request challenges come in the next versions.
+> **Status: v0.2 test build.** The header button and popup work, and viewing history is recorded. Challenges, standings, titles and Seerr request challenges come in the next versions.
 
 ## Requirements
 
@@ -24,7 +24,16 @@ Updates show up in the dashboard like any other plugin: click **Update**, then r
 
 ## Who can play
 
-Everyone shown on the login screen. Accounts set to *Hide this user from login screens* don't see the plugin.
+Everyone shown on the login screen. Accounts set to *Hide this user from login screens* don't see the plugin and aren't tracked. Jellyfin 12 hides new accounts by default, so check **Dashboard → Users** for each person. Use one account per person.
+
+## Viewing history and privacy
+
+From v0.2, Race to Finish records what each person watches: when, for how long (time actually watched, not skipped), on which device, and what the title is (genres, studio, director, writers, top-billed cast). Watching counts as *finished* at 85% or more. "Mark as played" never counts.
+
+- **Private by default.** Each person sees their own history in the **My Activity** tab. The admin sees nothing unless that person turns on *Share my viewing stats with the server admin*.
+- **Your data, your call.** Anyone can download everything stored about them, or delete it. Deleting also stops older history from being imported again.
+- **Existing history** from before the plugin was installed is imported once, automatically: Jellyfin's watched items, its activity log (kept 30 days by default), and the Playback Reporting plugin if you use it. Imported history never counts toward races.
+- Whoever runs the server can technically read the data files, as with Jellyfin's own history. The database lives at `<jellyfin data>/data/race-to-finish/history.db`.
 
 ## Credits
 
