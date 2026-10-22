@@ -6,6 +6,15 @@
     "overview": "Family watch-list races: first to finish wins a title.",
     "owner": "mscottwhit12-hub",
     "category": "General",
-    "versions": []
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "First test build: header button and Option D popup (Challenges and Hall of Champions are empty for now, Profiles lists everyone on the login screen), TV remote navigation, admin setup check, blur on/off.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/mscottwhit12-hub/Jellyfin-RTF/releases/download/v0.1.0/race-to-finish_0.1.0.0.zip",
+        "checksum": "a82c2ff082db2ffe9e7542d43fec70f3",
+        "timestamp": "2026-10-22T19:15:33Z"
+      }
+    ]
   }
 ]
