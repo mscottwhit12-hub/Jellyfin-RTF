@@ -23,6 +23,9 @@ public sealed class TmdbException : Exception
 
     /// <summary>Gets what went wrong.</summary>
     public TmdbProblem Kind { get; }
+
+    /// <summary>Gets a value indicating whether trying again straight away might work.</summary>
+    public bool Retryable { get; init; }
 }
 
 /// <summary>Kinds of TMDB problems.</summary>
@@ -164,6 +167,21 @@ public class TmdbClient
 
     private async Task<T> GetAsync<T>(string path, IDictionary<string, string> parameters, CancellationToken cancellationToken)
     {
+        // One retry for a passing hiccup (a dropped connection, a 5xx, rate limiting). Not for timeouts: a TMDB
+        // that isn't answering would just make the admin wait twice as long.
+        try
+        {
+            return await GetOnceAsync<T>(path, parameters, cancellationToken).ConfigureAwait(false);
+        }
+        catch (TmdbException ex) when (ex.Kind == TmdbProblem.Unavailable && ex.Retryable)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1.5), cancellationToken).ConfigureAwait(false);
+            return await GetOnceAsync<T>(path, parameters, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<T> GetOnceAsync<T>(string path, IDictionary<string, string> parameters, CancellationToken cancellationToken)
+    {
         var config = Plugin.Instance?.Configuration;
         (string? found, _) = JellyfinTmdbKey.Find(_logger);
         string key = found?.Trim() ?? string.Empty;
@@ -196,10 +214,14 @@ public class TmdbClient
             timeout.CancelAfter(TimeSpan.FromSeconds(20));
             response = await _httpClientFactory.CreateClient(NamedClient.Default).SendAsync(request, timeout.Token).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
+            // Network failure, timeout, bad address: all mean "couldn't reach TMDB".
             _logger.LogWarning(ex, "[RaceToFinish] TMDB request failed");
-            throw new TmdbException("Couldn't reach TMDB. Check the server's internet connection and try again.", TmdbProblem.Unavailable, ex);
+            throw new TmdbException("Couldn't reach TMDB. Check the server's internet connection and try again.", TmdbProblem.Unavailable, ex)
+            {
+                Retryable = ex is HttpRequestException,
+            };
         }
 
         using (response)
@@ -212,7 +234,10 @@ public class TmdbClient
             if (!response.IsSuccessStatusCode)
             {
                 string why = response.StatusCode == HttpStatusCode.TooManyRequests ? "TMDB is limiting requests right now" : $"TMDB answered {(int)response.StatusCode}";
-                throw new TmdbException(why + ". Try again in a minute.", TmdbProblem.Unavailable);
+                throw new TmdbException(why + ". Try again in a minute.", TmdbProblem.Unavailable)
+                {
+                    Retryable = response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500,
+                };
             }
 
             try

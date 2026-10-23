@@ -149,10 +149,19 @@ public class TopTenService
             throw new ArgumentOutOfRangeException(nameof(year), year, "Not one of the ready-made years.");
         }
 
-        if (refresh || !_cache.TryGetValue(year, out var cached) || DateTime.UtcNow - cached.FetchedUtc > CacheFor)
+        bool haveCopy = _cache.TryGetValue(year, out var cached);
+        if (refresh || !haveCopy || DateTime.UtcNow - cached.FetchedUtc > CacheFor)
         {
-            cached = await FetchAsync(year, cancellationToken).ConfigureAwait(false);
-            _cache[year] = cached;
+            try
+            {
+                cached = await FetchAsync(year, cancellationToken).ConfigureAwait(false);
+                _cache[year] = cached;
+            }
+            catch (TmdbException ex) when (haveCopy && !refresh && ex.Kind == TmdbProblem.Unavailable)
+            {
+                // TMDB is having trouble: an older copy beats an error. (An explicit refresh still reports it.)
+                _logger.LogWarning("[RaceToFinish] TMDB unavailable, using the copy from {Fetched:u} for {Year}", cached.FetchedUtc, year);
+            }
         }
 
         var library = LibraryIndex.Build(_libraryManager);
@@ -247,15 +256,21 @@ public class TopTenService
 
                 if (item.ProviderIds is not null && item.ProviderIds.TryGetValue("Tmdb", out string? tmdb) && !string.IsNullOrWhiteSpace(tmdb))
                 {
+                    // A file Jellyfin matched with TMDB is only ever that film. It's never offered for title
+                    // matching, so a different film with the same title can't claim it.
                     index._byTmdb.TryAdd(tmdb.Trim(), item);
+                    continue;
                 }
 
-                if (item.ProductionYear is int year)
+                int? year = item.ProductionYear ?? item.PremiereDate?.Year;
+                if (year is int y)
                 {
-                    index._byTitleYear.TryAdd(Key(item.Name, year), item);
-                    if (!string.IsNullOrWhiteSpace(item.OriginalTitle))
+                    foreach (string? title in new[] { item.Name, item.OriginalTitle })
                     {
-                        index._byTitleYear.TryAdd(Key(item.OriginalTitle, year), item);
+                        if (Key(title, y) is string key)
+                        {
+                            index._byTitleYear.TryAdd(key, item);
+                        }
                     }
                 }
             }
@@ -276,14 +291,9 @@ public class TopTenService
             {
                 foreach (string? title in new[] { movie.Title, movie.OriginalTitle })
                 {
-                    if (string.IsNullOrWhiteSpace(title))
-                    {
-                        continue;
-                    }
-
                     foreach (int y in new[] { year, year - 1, year + 1 })
                     {
-                        if (_byTitleYear.TryGetValue(Key(title, y), out BaseItem? byTitle))
+                        if (Key(title, y) is string key && _byTitleYear.TryGetValue(key, out BaseItem? byTitle))
                         {
                             return (byTitle, "title");
                         }
@@ -295,8 +305,14 @@ public class TopTenService
         }
 
         // Case, accents and punctuation don't matter: "Spider-Man: Across the Spider-Verse" = "spider man across the spider verse".
-        private static string Key(string title, int year)
+        // Null when the title has nothing to compare (empty, or only punctuation), so such titles never match.
+        private static string? Key(string? title, int year)
         {
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return null;
+            }
+
             string decomposed = title.Normalize(NormalizationForm.FormD);
             var builder = new StringBuilder(decomposed.Length);
             foreach (char c in decomposed)
@@ -307,7 +323,7 @@ public class TopTenService
                 }
             }
 
-            return builder.Append('|').Append(year.ToString(CultureInfo.InvariantCulture)).ToString();
+            return builder.Length == 0 ? null : builder.Append('|').Append(year.ToString(CultureInfo.InvariantCulture)).ToString();
         }
     }
 }

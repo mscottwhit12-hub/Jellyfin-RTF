@@ -95,6 +95,11 @@ public class TopTenController : ControllerBase
                 }),
             };
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The admin left the page before TMDB answered. Nobody is waiting, so don't log it as an error.
+            return new EmptyResult();
+        }
         catch (TmdbException ex)
         {
             return ex.Kind == TmdbProblem.NoKey
