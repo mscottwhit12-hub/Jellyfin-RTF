@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1E1B4B"/>
+      <stop offset="0.55" stop-color="#4C1D95"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.52" cy="0.55" r="0.5">
+      <stop offset="0" stop-color="#C4B5FD" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#C4B5FD" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="check" width="80" height="80" patternUnits="userSpaceOnUse">
+      <rect width="80" height="80" fill="#F8FAFC"/>
+      <rect width="40" height="40" fill="#0F172A"/>
+      <rect x="40" y="40" width="40" height="40" fill="#0F172A"/>
+    </pattern>
+    <linearGradient id="bucketShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.18"/>
+    </linearGradient>
+    <clipPath id="bucketClip">
+      <path d="M -135 -95 L 135 -95 L 100 140 Q 0 160 -100 140 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect width="1280" height="720" fill="url(#glow)"/>
+
+  <!-- Finish line -->
+  <rect x="860" y="0" width="80" height="720" fill="url(#check)"/>
+  <rect x="852" y="0" width="8" height="720" fill="#0F172A" opacity="0.35"/>
+
+  <!-- Speed lines -->
+  <g stroke="#EDE9FE" stroke-linecap="round" fill="none">
+    <line x1="150" y1="300" x2="420" y2="300" stroke-width="14" opacity="0.85"/>
+    <line x1="230" y1="360" x2="440" y2="360" stroke-width="10" opacity="0.6"/>
+    <line x1="110" y1="420" x2="430" y2="420" stroke-width="16" opacity="0.9"/>
+    <line x1="260" y1="480" x2="450" y2="480" stroke-width="10" opacity="0.55"/>
+    <line x1="180" y1="540" x2="440" y2="540" stroke-width="12" opacity="0.7"/>
+  </g>
+
+  <!-- Kernels left behind -->
+  <g fill="#FFF7E0" stroke="#E8C77A" stroke-width="4">
+    <circle cx="330" cy="235" r="20"/>
+    <circle cx="250" cy="255" r="14"/>
+    <circle cx="395" cy="195" r="13"/>
+  </g>
+
+  <!-- Snapped finish ribbon -->
+  <path d="M 860 330 C 820 345 790 330 770 350 L 778 372 C 800 352 830 368 860 352 Z" fill="#F43F5E"/>
+  <path d="M 940 330 C 990 300 1020 330 1060 300 L 1068 322 C 1030 352 996 322 940 352 Z" fill="#F43F5E"/>
+
+  <!-- The racer: a popcorn bucket, leaning into the finish -->
+  <g transform="translate(700 410) rotate(-10)">
+    <!-- Popcorn -->
+    <g fill="#FFF7E0" stroke="#E8C77A" stroke-width="5">
+      <circle cx="-105" cy="-110" r="42"/>
+      <circle cx="-45" cy="-140" r="48"/>
+      <circle cx="20" cy="-150" r="46"/>
+      <circle cx="85" cy="-128" r="44"/>
+      <circle cx="125" cy="-100" r="34"/>
+      <circle cx="-15" cy="-105" r="40"/>
+      <circle cx="55" cy="-95" r="38"/>
+    </g>
+    <!-- Bucket -->
+    <g clip-path="url(#bucketClip)">
+      <rect x="-150" y="-100" width="300" height="270" fill="#F8FAFC"/>
+      <g fill="#E11D48">
+        <rect x="-150" y="-100" width="45" height="270"/>
+        <rect x="-60" y="-100" width="45" height="270"/>
+        <rect x="30" y="-100" width="45" height="270"/>
+        <rect x="120" y="-100" width="45" height="270"/>
+      </g>
+      <rect x="-150" y="-100" width="300" height="270" fill="url(#bucketShade)"/>
+    </g>
+    <path d="M -135 -95 L 135 -95 L 100 140 Q 0 160 -100 140 Z" fill="none" stroke="#7F1D1D" stroke-width="8" stroke-linejoin="round"/>
+    <rect x="-145" y="-108" width="290" height="26" rx="13" fill="#FDE68A" stroke="#7F1D1D" stroke-width="7"/>
+    <!-- Face: eyes on the finish, big grin -->
+    <g>
+      <ellipse cx="-38" cy="-8" rx="26" ry="30" fill="#fff" stroke="#1F2937" stroke-width="6"/>
+      <ellipse cx="42" cy="-8" rx="26" ry="30" fill="#fff" stroke="#1F2937" stroke-width="6"/>
+      <circle cx="-26" cy="-4" r="12" fill="#1F2937"/>
+      <circle cx="54" cy="-4" r="12" fill="#1F2937"/>
+      <circle cx="-22" cy="-9" r="4" fill="#fff"/>
+      <circle cx="58" cy="-9" r="4" fill="#fff"/>
+      <path d="M -60 -46 L -18 -38" stroke="#1F2937" stroke-width="8" stroke-linecap="round"/>
+      <path d="M 22 -38 L 64 -46" stroke="#1F2937" stroke-width="8" stroke-linecap="round"/>
+      <path d="M -42 48 Q 5 95 55 48 Z" fill="#7F1D1D" stroke="#1F2937" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M -30 55 Q 5 70 44 55" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+    </g>
+    <!-- Running legs -->
+    <g stroke="#1F2937" stroke-width="12" stroke-linecap="round" fill="none">
+      <path d="M -40 148 L -85 200 L -125 192"/>
+      <path d="M 40 150 L 70 205 L 115 212"/>
+    </g>
+  </g>
+
+  <!-- Victory sparkles -->
+  <g fill="#FDE047">
+    <path d="M 1010 170 l 12 30 l 30 12 l -30 12 l -12 30 l -12 -30 l -30 -12 l 30 -12 Z"/>
+    <path d="M 1110 470 l 8 20 l 20 8 l -20 8 l -8 20 l -8 -20 l -20 -8 l 20 -8 Z"/>
+    <path d="M 560 110 l 7 17 l 17 7 l -17 7 l -7 17 l -7 -17 l -17 -7 l 17 -7 Z"/>
+  </g>
+</svg>

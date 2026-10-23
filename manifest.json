@@ -6,6 +6,7 @@
     "overview": "Family watch-list races: first to finish wins a title.",
     "owner": "mscottwhit12-hub",
     "category": "General",
+    "imageUrl": "https://raw.githubusercontent.com/mscottwhit12-hub/Jellyfin-RTF/main/assets/race-to-finish.png",
     "versions": [
       {
         "version": "0.2.2.0",

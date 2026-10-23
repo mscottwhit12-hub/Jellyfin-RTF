@@ -1,5 +1,7 @@
 # Race to Finish for Jellyfin
 
+![Race to Finish](assets/race-to-finish.png)
+
 Family watch-list races. An admin picks a collection, everyone races to watch all of it, and the first three to finish win titles that show on their profile.
 
 > **Status: v0.2 test build.** The header button and popup work, and viewing history is recorded. Challenges, standings, titles and Seerr request challenges come in the next versions.
