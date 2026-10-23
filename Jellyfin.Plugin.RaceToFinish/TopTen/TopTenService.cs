@@ -9,10 +9,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.RaceToFinish.TopTen;
 
-/// <summary>One film in a Top 10 list, and whether the server has it.</summary>
+/// <summary>One film in a Top 5 list, and whether the server has it.</summary>
 public sealed class TopTenEntry
 {
-    /// <summary>Gets or sets the rank, 1 to 10.</summary>
+    /// <summary>Gets or sets the rank, 1 to 5.</summary>
     public int Rank { get; set; }
 
     /// <summary>Gets or sets the TMDB ID.</summary>
@@ -46,13 +46,13 @@ public sealed class TopTenEntry
     public string? MatchedBy { get; set; }
 }
 
-/// <summary>A year's Top 10 and how much of it the server has.</summary>
+/// <summary>A year's Top 5 and how much of it the server has.</summary>
 public sealed class TopTenList
 {
     /// <summary>Gets or sets the year.</summary>
     public int Year { get; set; }
 
-    /// <summary>Gets or sets the display name, e.g. "Top 10 of 2023 (TMDB)".</summary>
+    /// <summary>Gets or sets the display name, e.g. "Top 5 of 2023 (TMDB)".</summary>
     public string Label { get; set; } = string.Empty;
 
     /// <summary>Gets or sets a plain-language description of how the list is made.</summary>
@@ -75,12 +75,14 @@ public sealed class TopTenList
 }
 
 /// <summary>
-/// The ready-made "Top 10 movies of a year" lists.
+/// The ready-made "Top 5 movies of a year" lists.
 ///
-/// How a list is made: movies whose primary release is in that year, sorted by TMDB rating, best first. To keep
-/// obscure films with a handful of votes out, a film needs at least 1,000 votes; if a year has fewer than 10 such
-/// films the minimum steps down to 500, then 200. Documentaries and TV movies are left out (this keeps concert
-/// films and TV specials out), and so are films under an hour. Adult titles are never included.
+/// How a list is made: movies whose primary release is in that year, sorted by TMDB rating, best first. A film
+/// needs at least 3,000 votes, so the list is films lots of people have actually seen and small fan groups can't
+/// rate a niche title to the top; if a year has fewer than 5 such films the minimum steps down to 2,000, then
+/// 1,000. Documentaries and TV movies are left out (this keeps concert films and TV specials out), and so are
+/// films under an hour. Adult titles are never included. A few films whose rating is clearly fan-boosted are
+/// blocked by TMDB ID (see <see cref="Blocked"/>); the next film moves up.
 /// Lists are kept for a day so previews don't hit TMDB every time; a challenge freezes its own copy when it starts.
 /// </summary>
 public class TopTenService
@@ -90,14 +92,25 @@ public class TopTenService
 
     /// <summary>Plain-language description shown to admins.</summary>
     public const string DefinitionText =
-        "The 10 highest-rated movies on TMDB first released that year, among films with at least 1,000 votes " +
-        "(fewer if a year doesn't have 10 such films). Documentaries, TV movies and films under an hour are left out.";
+        "The 5 highest-rated movies on TMDB first released that year, among films with at least 3,000 votes " +
+        "(fewer if a year doesn't have 5 such films). Documentaries, TV movies and films under an hour are left out, " +
+        "and so are a few films whose ratings are boosted by fan campaigns.";
 
-    private const int ListSize = 10;
+    /// <summary>
+    /// Films left out because their TMDB rating is inflated by a dedicated fan base rather than broad audiences.
+    /// Keyed by TMDB ID so a renamed title can't slip through. Adding one needs a plugin update.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<int, string> Blocked = new Dictionary<int, string>
+    {
+        [1010581] = "My Fault (2023): Spanish teen romance rated far above its reviews by its fan base",
+        [610150] = "Dragon Ball Super: Super Hero (2022): franchise fan ratings, well above general audiences",
+    };
+
+    private const int ListSize = 5;
     private const string DocumentaryGenre = "99";
     private const string TvMovieGenre = "10770";
     private const string PosterBase = "https://image.tmdb.org/t/p/w342";
-    private static readonly int[] VoteSteps = [1000, 500, 200];
+    private static readonly int[] VoteSteps = [3000, 2000, 1000];
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(24);
 
     private readonly TmdbClient _tmdb;
@@ -119,12 +132,12 @@ public class TopTenService
     /// <summary>Display name for a year's list.</summary>
     /// <param name="year">Year.</param>
     /// <returns>Label.</returns>
-    public static string LabelFor(int year) => string.Create(CultureInfo.InvariantCulture, $"Top 10 of {year} (TMDB)");
+    public static string LabelFor(int year) => string.Create(CultureInfo.InvariantCulture, $"Top 5 of {year} (TMDB)");
 
     /// <summary>Forgets cached lists, so the next request asks TMDB again (e.g. after changing the key).</summary>
     public void ClearCache() => _cache.Clear();
 
-    /// <summary>Gets a year's Top 10, matched against the library.</summary>
+    /// <summary>Gets a year's Top 5, matched against the library.</summary>
     /// <param name="year">One of <see cref="PresetYears"/>.</param>
     /// <param name="refresh">True to ask TMDB again even if a recent copy is cached.</param>
     /// <param name="cancellationToken">Cancellation.</param>
@@ -198,7 +211,7 @@ public class TopTenService
 
             // TMDB already sorts by rating; ties are broken by more votes, then title, so the order is stable.
             best = results
-                .Where(m => m.Id > 0 && !string.IsNullOrWhiteSpace(m.Title))
+                .Where(m => m.Id > 0 && !string.IsNullOrWhiteSpace(m.Title) && !Blocked.ContainsKey(m.Id))
                 .OrderByDescending(m => m.VoteAverage)
                 .ThenByDescending(m => m.VoteCount)
                 .ThenBy(m => m.Title, StringComparer.OrdinalIgnoreCase)

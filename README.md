@@ -40,7 +40,7 @@ From v0.2, Race to Finish records what each person watches: when, for how long (
 
 ## Credits
 
-The ready-made "Top 10 of 2020–2025" lists come from TMDB, using the TMDB key Jellyfin already has (no setup). This product uses the TMDB API but is not endorsed or certified by TMDB.
+The ready-made "Top 5 of 2020–2025" lists come from TMDB, using the TMDB key Jellyfin already has (no setup). This product uses the TMDB API but is not endorsed or certified by TMDB.
 
 ## License
 

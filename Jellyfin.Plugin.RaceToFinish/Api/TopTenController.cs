@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.RaceToFinish.Api;
 
 /// <summary>
-/// The ready-made "Top 10 movies of a year" lists, for the admin. Each list shows which films the server has, so
+/// The ready-made "Top 5 movies of a year" lists, for the admin. Each list shows which films the server has, so
 /// the admin can see what's missing before starting a challenge. Starting the challenge itself comes with the
 /// challenge features; these endpoints only read.
 /// </summary>
@@ -24,7 +24,7 @@ public class TopTenController : ControllerBase
     private readonly ILogger<TopTenController> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="TopTenController"/> class.</summary>
-    /// <param name="topTen">Top 10 service.</param>
+    /// <param name="topTen">Top 5 service.</param>
     /// <param name="logger">Logger.</param>
     public TopTenController(TopTenService topTen, ILogger<TopTenController> logger)
     {
@@ -47,7 +47,7 @@ public class TopTenController : ControllerBase
         };
     }
 
-    /// <summary>A year's Top 10, with which films the server has.</summary>
+    /// <summary>A year's Top 5, with which films the server has.</summary>
     /// <param name="year">2020 to 2025.</param>
     /// <param name="refresh">True to ask TMDB again instead of using today's copy.</param>
     /// <param name="cancellationToken">Cancellation.</param>

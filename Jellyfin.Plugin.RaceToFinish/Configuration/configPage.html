@@ -24,8 +24,8 @@
                 Safe to run again. Imported history never counts toward races.</div>
                 <table id="RtfUsers" style="width:100%;margin:1.5em 0;border-collapse:collapse"></table>
 
-                <h3 class="sectionTitle">Ready-made Top 10 challenges</h3>
-                <p>The Top 10 movies of 2020 to 2025 come from TMDB, using the TMDB key Jellyfin already has. Nothing to set up.
+                <h3 class="sectionTitle">Ready-made Top 5 challenges</h3>
+                <p>The Top 5 movies of 2020 to 2025 come from TMDB, using the TMDB key Jellyfin already has. Nothing to set up.
                 A challenge can only start once every film in its list is on your server.</p>
                 <ul id="RtfTopTen" style="list-style:none;padding:0;line-height:2"></ul>
                 <button is="emby-button" type="button" id="RtfTopTenRefresh" class="raised emby-button"><span>Refresh lists</span></button>
@@ -139,7 +139,7 @@
                                 } else { show('could not load. Check the server log for [RaceToFinish].'); }
                             });
                         });
-                    }, function () { list.textContent = 'Could not load the Top 10 lists. Check the server log for [RaceToFinish].'; });
+                    }, function () { list.textContent = 'Could not load the Top 5 lists. Check the server log for [RaceToFinish].'; });
                 }
 
                 document.querySelector('#RtfTopTenRefresh').addEventListener('click', function () { loadTopTen(true); });
