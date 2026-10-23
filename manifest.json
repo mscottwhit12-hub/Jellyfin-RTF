@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.2.1.0",
+        "changelog": "Ready-made Top 5 movie lists for 2020-2025 from TMDB, using the TMDB key Jellyfin already has (no setup). Settings page shows how many of each list are on your server. Not yet startable as challenges.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/mscottwhit12-hub/Jellyfin-RTF/releases/download/v0.2.1/race-to-finish_0.2.1.0.zip",
+        "checksum": "68d4d923e28780852c359bd134be0122",
+        "timestamp": "2026-10-23T05:39:25Z"
+      },
+      {
         "version": "0.2.0.0",
         "changelog": "Viewing history. Records what each person watches (time actually watched, parts seen, device, cast, director, studio, genres), counts a movie or episode as finished at 85% seen, and keeps an interrupted viewing together when picked up again within 12 hours. Imports history from before install (Jellyfin watch data, activity log, Playback Reporting) without ever counting it toward races. New My Activity tab: private by default, optional sharing with the admin, download and delete your data. Admin page: re-run import, remove data of deleted accounts.",
         "targetAbi": "12.0.0.0",
