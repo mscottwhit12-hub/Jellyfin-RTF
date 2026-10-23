@@ -9,8 +9,7 @@ namespace Jellyfin.Plugin.RaceToFinish.Api;
 
 /// <summary>
 /// The ready-made "Top 5 movies of a year" lists, for the admin. Each list shows which films the server has, so
-/// the admin can see what's missing before starting a challenge. Starting the challenge itself comes with the
-/// challenge features; these endpoints only read.
+/// the admin can see what's missing, and can be turned on once every film is on the server (which locks its list).
 /// </summary>
 [ApiController]
 [Route("RaceToFinish/Admin/TopTen")]
@@ -65,9 +64,52 @@ public class TopTenController : ControllerBase
             return NotFound(new { error = $"There's no ready-made list for {year}. Available: {string.Join(", ", TopTenService.PresetYears)}." });
         }
 
+        return await Respond(() => _topTen.GetListAsync(year, refresh, cancellationToken), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Turns a year's challenge on, locking in its list. Refused (409) unless every film is on the server.</summary>
+    /// <param name="year">2020 to 2025.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <returns>The locked list, or why it can't be turned on.</returns>
+    [HttpPost("{year:int}/TurnOn")]
+    [Produces(MediaTypeNames.Application.Json)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<object>> TurnOn([FromRoute] int year, CancellationToken cancellationToken)
+    {
+        if (!TopTenService.PresetYears.Contains(year))
+        {
+            return NotFound(new { error = $"There's no ready-made list for {year}." });
+        }
+
+        return await Respond(() => _topTen.TurnOnAsync(year, cancellationToken), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Turns a year's challenge off and forgets its locked list.</summary>
+    /// <param name="year">2020 to 2025.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <returns>The current list.</returns>
+    [HttpPost("{year:int}/TurnOff")]
+    [Produces(MediaTypeNames.Application.Json)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<object>> TurnOff([FromRoute] int year, CancellationToken cancellationToken)
+    {
+        if (!TopTenService.PresetYears.Contains(year))
+        {
+            return NotFound(new { error = $"There's no ready-made list for {year}." });
+        }
+
+        _topTen.TurnOff(year);
+        return await Respond(() => _topTen.GetListAsync(year, false, cancellationToken), cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ActionResult<object>> Respond(Func<Task<TopTenList>> get, CancellationToken cancellationToken)
+    {
         try
         {
-            TopTenList list = await _topTen.GetListAsync(year, refresh, cancellationToken).ConfigureAwait(false);
+            TopTenList list = await get().ConfigureAwait(false);
             return new
             {
                 year = list.Year,
@@ -78,6 +120,8 @@ public class TopTenController : ControllerBase
                 onServerCount = list.OnServerCount,
                 missingCount = list.Movies.Count - list.OnServerCount,
                 complete = list.Complete,
+                turnedOn = list.TurnedOnUtc is not null,
+                turnedOnUtc = list.TurnedOnUtc,
                 attribution = Attribution,
                 movies = list.Movies.Select(m => new
                 {
@@ -92,8 +136,13 @@ public class TopTenController : ControllerBase
                     onServer = m.OnServer,
                     itemId = m.ItemId,
                     matchedBy = m.MatchedBy,
+                    serverTitle = m.ServerTitle,
                 }),
             };
+        }
+        catch (TopTenRefusedException ex)
+        {
+            return Conflict(new { error = ex.Message, problem = "incomplete" });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

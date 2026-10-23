@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using Jellyfin.Data.Enums;
+using Jellyfin.Plugin.RaceToFinish.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
@@ -44,6 +45,9 @@ public sealed class TopTenEntry
 
     /// <summary>Gets or sets how it was matched: "tmdb" (exact ID) or "title" (title and year).</summary>
     public string? MatchedBy { get; set; }
+
+    /// <summary>Gets or sets the film's name in the library, when on the server.</summary>
+    public string? ServerTitle { get; set; }
 }
 
 /// <summary>A year's Top 5 and how much of it the server has.</summary>
@@ -72,6 +76,20 @@ public sealed class TopTenList
 
     /// <summary>Gets a value indicating whether every film is on the server (the challenge can start).</summary>
     public bool Complete => Movies.Count > 0 && Movies.All(m => m.OnServer);
+
+    /// <summary>Gets or sets when the admin turned this challenge on (its list is then locked), or null if off.</summary>
+    public DateTime? TurnedOnUtc { get; set; }
+}
+
+/// <summary>Turning a challenge on was refused, with a reason the admin can act on.</summary>
+public sealed class TopTenRefusedException : Exception
+{
+    /// <summary>Initializes a new instance of the <see cref="TopTenRefusedException"/> class.</summary>
+    /// <param name="message">Plain-language reason.</param>
+    public TopTenRefusedException(string message)
+        : base(message)
+    {
+    }
 }
 
 /// <summary>
@@ -117,6 +135,7 @@ public class TopTenService
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<TopTenService> _logger;
     private readonly ConcurrentDictionary<int, (DateTime FetchedUtc, int MinimumVotes, List<TmdbMovie> Movies)> _cache = new();
+    private readonly object _settingsLock = new();
 
     /// <summary>Initializes a new instance of the <see cref="TopTenService"/> class.</summary>
     /// <param name="tmdb">TMDB client.</param>
@@ -149,6 +168,19 @@ public class TopTenService
             throw new ArgumentOutOfRangeException(nameof(year), year, "Not one of the ready-made years.");
         }
 
+        // A challenge that's on uses the list locked in when it was turned on; TMDB isn't asked.
+        ReadyMadeChallenge? on = FindTurnedOn(year);
+        if (on is not null)
+        {
+            return Build(year, on.MinimumVotes, on.TurnedOnUtc, on.Films, on.TurnedOnUtc);
+        }
+
+        var cached = await GetCachedAsync(year, refresh, cancellationToken).ConfigureAwait(false);
+        return Build(year, cached.MinimumVotes, cached.FetchedUtc, cached.Movies, null);
+    }
+
+    private async Task<(DateTime FetchedUtc, int MinimumVotes, List<TmdbMovie> Movies)> GetCachedAsync(int year, bool refresh, CancellationToken cancellationToken)
+    {
         bool haveCopy = _cache.TryGetValue(year, out var cached);
         if (refresh || !haveCopy || DateTime.UtcNow - cached.FetchedUtc > CacheFor)
         {
@@ -164,18 +196,90 @@ public class TopTenService
             }
         }
 
+        return cached;
+    }
+
+    /// <summary>Turns a year's challenge on, locking in its current list. Refused unless every film is on the server.</summary>
+    /// <param name="year">Year.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <returns>The locked list.</returns>
+    public async Task<TopTenList> TurnOnAsync(int year, CancellationToken cancellationToken)
+    {
+        if (!PresetYears.Contains(year))
+        {
+            throw new ArgumentOutOfRangeException(nameof(year), year, "Not one of the ready-made years.");
+        }
+
+        if (FindTurnedOn(year) is not null)
+        {
+            return await GetListAsync(year, false, cancellationToken).ConfigureAwait(false);
+        }
+
+        // Check and lock exactly the same films, even if someone refreshes the list meanwhile.
+        var cached = await GetCachedAsync(year, false, cancellationToken).ConfigureAwait(false);
+        TopTenList current = Build(year, cached.MinimumVotes, cached.FetchedUtc, cached.Movies, null);
+
+        if (!current.Complete)
+        {
+            var missing = current.Movies.Where(m => !m.OnServer).Select(m => m.Title).ToList();
+            throw new TopTenRefusedException(missing.Count == 0
+                ? $"TMDB returned no films for {year}. Try Refresh lists."
+                : $"Add every film to your server first. Missing: {string.Join(", ", missing)}.");
+        }
+
+        Plugin plugin = Plugin.Instance ?? throw new InvalidOperationException("Plugin not loaded");
+        lock (_settingsLock)
+        {
+            if (FindTurnedOn(year) is null)
+            {
+                plugin.Configuration.ReadyMadeChallenges.Add(new ReadyMadeChallenge
+                {
+                    Year = year,
+                    TurnedOnUtc = DateTime.UtcNow,
+                    MinimumVotes = cached.MinimumVotes,
+                    Films = cached.Movies.ToList(),
+                });
+                plugin.SaveConfiguration();
+                _logger.LogInformation("[RaceToFinish] {Label} turned on", LabelFor(year));
+            }
+        }
+
+        return await GetListAsync(year, false, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Turns a year's challenge off. Its locked list is forgotten; turning it on again uses the current list.</summary>
+    /// <param name="year">Year.</param>
+    public void TurnOff(int year)
+    {
+        Plugin plugin = Plugin.Instance ?? throw new InvalidOperationException("Plugin not loaded");
+        lock (_settingsLock)
+        {
+            if (plugin.Configuration.ReadyMadeChallenges.RemoveAll(c => c.Year == year) > 0)
+            {
+                plugin.SaveConfiguration();
+                _logger.LogInformation("[RaceToFinish] {Label} turned off", LabelFor(year));
+            }
+        }
+    }
+
+    private static ReadyMadeChallenge? FindTurnedOn(int year)
+        => Plugin.Instance?.Configuration.ReadyMadeChallenges?.FirstOrDefault(c => c.Year == year && c.Films.Count > 0);
+
+    private TopTenList Build(int year, int minimumVotes, DateTime fetchedUtc, IEnumerable<TmdbMovie> movies, DateTime? turnedOnUtc)
+    {
         var library = LibraryIndex.Build(_libraryManager);
         var list = new TopTenList
         {
             Year = year,
             Label = LabelFor(year),
             Definition = DefinitionText,
-            MinimumVotes = cached.MinimumVotes,
-            FetchedUtc = cached.FetchedUtc,
+            MinimumVotes = minimumVotes,
+            FetchedUtc = fetchedUtc,
+            TurnedOnUtc = turnedOnUtc,
         };
 
         int rank = 1;
-        foreach (TmdbMovie movie in cached.Movies)
+        foreach (TmdbMovie movie in movies)
         {
             (BaseItem? item, string? how) = library.Find(movie);
             list.Movies.Add(new TopTenEntry
@@ -191,6 +295,7 @@ public class TopTenService
                 OnServer = item is not null,
                 ItemId = item?.Id.ToString("N", CultureInfo.InvariantCulture),
                 MatchedBy = how,
+                ServerTitle = item?.Name,
             });
         }
 

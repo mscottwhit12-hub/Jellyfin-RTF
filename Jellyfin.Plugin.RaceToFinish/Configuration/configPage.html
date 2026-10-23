@@ -26,8 +26,31 @@
 
                 <h3 class="sectionTitle">Ready-made Top 5 challenges</h3>
                 <p>The Top 5 movies of 2020 to 2025 come from TMDB, using the TMDB key Jellyfin already has. Nothing to set up.
-                A challenge can only start once every film in its list is on your server.</p>
-                <ul id="RtfTopTen" style="list-style:none;padding:0;line-height:2"></ul>
+                Open a year to see its films. A year can be turned on once all 5 are on your server; turning it on locks its list.
+                <b>The races themselves arrive in the next update</b>: years you turn on now will open as races then.</p>
+                <style>
+                    .rtfYear { border: 1px solid rgba(255,255,255,.12); border-radius: .5em; margin: .6em 0; }
+                    .rtfYear > summary { cursor: pointer; padding: .8em 1em; display: flex; gap: .8em; align-items: center; flex-wrap: wrap; }
+                    .rtfYear > summary::-webkit-details-marker { display: none; }
+                    .rtfYear > summary:before { content: '▸'; opacity: .6; }
+                    .rtfYear[open] > summary:before { content: '▾'; }
+                    .rtfYearName { font-weight: 600; }
+                    .rtfPill { font-size: .8em; padding: .15em .7em; border-radius: 1em; background: rgba(255,255,255,.1); }
+                    .rtfPill.on { background: #166534; color: #DCFCE7; }
+                    .rtfBody { padding: 0 1em 1em; }
+                    .rtfFilms { list-style: none; padding: 0; margin: 0 0 .8em; }
+                    .rtfFilm { display: flex; gap: .8em; align-items: center; padding: .4em 0; border-top: 1px solid rgba(255,255,255,.06); }
+                    .rtfFilm img, .rtfFilm .rtfNoPoster { width: 40px; height: 60px; border-radius: 4px; object-fit: cover; background: rgba(255,255,255,.08); flex: none; }
+                    .rtfFilmText { flex: 1; min-width: 0; }
+                    .rtfFilmTitle { font-weight: 600; overflow-wrap: anywhere; }
+                    .rtfFilmMeta { font-size: .85em; opacity: .7; }
+                    .rtfHave { color: #4ADE80; white-space: nowrap; }
+                    .rtfMissing { color: #FDBA74; white-space: nowrap; }
+                    .rtfActions { display: flex; gap: 1em; align-items: center; flex-wrap: wrap; }
+                    .rtfHint { font-size: .9em; opacity: .8; flex: 1; min-width: 12em; }
+                    .rtfActions button[disabled] { opacity: .35; cursor: not-allowed; filter: grayscale(1); }
+                </style>
+                <div id="RtfTopTen"></div>
                 <button is="emby-button" type="button" id="RtfTopTenRefresh" class="raised emby-button"><span>Refresh lists</span></button>
                 <div class="fieldDescription" id="RtfTopTenNote"></div>
 
@@ -119,6 +142,93 @@
                     });
                 }
 
+                var openYears = {};
+
+                function el(tag, cls, txt) {
+                    var e = document.createElement(tag);
+                    if (cls) { e.className = cls; }
+                    if (txt !== undefined) { e.textContent = txt; }
+                    return e;
+                }
+
+                function errorText(err, fallback) {
+                    if (err && typeof err.json === 'function') {
+                        return err.json().then(function (b) { return b.error || fallback; }, function () { return fallback; });
+                    }
+                    return Promise.resolve(fallback);
+                }
+
+                function renderYear(card, r) {
+                    var summary = card.querySelector('summary');
+                    var body = card.querySelector('.rtfBody');
+                    summary.innerHTML = '';
+                    summary.appendChild(el('span', 'rtfYearName', r.label));
+                    var count = el('span', r.complete ? 'rtfHave' : 'rtfMissing', r.onServerCount + ' of ' + r.movies.length + ' on your server');
+                    summary.appendChild(count);
+                    if (r.turnedOn) { summary.appendChild(el('span', 'rtfPill on', 'On')); }
+
+                    body.innerHTML = '';
+                    var films = el('ol', 'rtfFilms');
+                    r.movies.forEach(function (m) {
+                        var li = el('li', 'rtfFilm');
+                        // Films on the server use Jellyfin's own poster; others use TMDB's. A blank tile if neither loads.
+                        var src = m.onServer && m.itemId ? ApiClient.getScaledImageUrl(m.itemId, { type: 'Primary', maxHeight: 120 })
+                            : (m.posterUrl ? m.posterUrl.replace('/w342/', '/w92/') : null);
+                        if (src) {
+                            var img = document.createElement('img');
+                            img.loading = 'lazy'; img.alt = '';
+                            img.addEventListener('error', function () { img.replaceWith(el('div', 'rtfNoPoster')); });
+                            img.src = src;
+                            li.appendChild(img);
+                        } else { li.appendChild(el('div', 'rtfNoPoster')); }
+                        var text = el('div', 'rtfFilmText');
+                        text.appendChild(el('div', 'rtfFilmTitle', m.rank + '. ' + m.title + (m.year ? ' (' + m.year + ')' : '')));
+                        var meta = 'TMDB ' + m.rating + ' · ' + m.votes.toLocaleString() + ' votes';
+                        if (m.onServer && m.serverTitle && m.serverTitle !== m.title) { meta += ' · on your server as "' + m.serverTitle + '"'; }
+                        text.appendChild(el('div', 'rtfFilmMeta', meta));
+                        li.appendChild(text);
+                        if (m.onServer) {
+                            var have = el('a', 'rtfHave', '✔ On your server');
+                            have.href = '#/details?id=' + m.itemId;
+                            have.style.textDecoration = 'none';
+                            li.appendChild(have);
+                        } else { li.appendChild(el('span', 'rtfMissing', '✖ Missing')); }
+                        films.appendChild(li);
+                    });
+                    body.appendChild(films);
+
+                    var actions = el('div', 'rtfActions');
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.setAttribute('is', 'emby-button');
+                    btn.className = 'raised emby-button' + (r.turnedOn ? '' : ' button-submit');
+                    btn.textContent = r.turnedOn ? 'Turn off' : 'Turn on';
+                    var missing = r.movies.length - r.onServerCount;
+                    var hint;
+                    if (r.turnedOn) {
+                        hint = 'On since ' + new Date(r.turnedOnUtc).toLocaleDateString() + '. This list is locked. It opens as a race when challenges arrive in the next update.';
+                    } else if (!r.complete) {
+                        btn.disabled = true;
+                        hint = r.movies.length ? 'Add the ' + missing + ' missing film' + (missing === 1 ? '' : 's') + ' to your server to turn this on.' : 'TMDB returned no films. Try Refresh lists.';
+                    } else {
+                        hint = (r.movies.length === 5 ? 'All 5 are' : 'All ' + r.movies.length + ' films are') + ' on your server. Turning it on locks this list.';
+                    }
+                    var hintEl = el('div', 'rtfHint', hint);
+                    btn.addEventListener('click', function () {
+                        btn.disabled = true;
+                        hintEl.textContent = r.turnedOn ? 'Turning off…' : 'Turning on…';
+                        ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('RaceToFinish/Admin/TopTen/' + r.year + (r.turnedOn ? '/TurnOff' : '/TurnOn')), dataType: 'json' })
+                            .then(function (updated) { renderYear(card, updated); }, function (err) {
+                                errorText(err, 'Could not change it. Check the server log for [RaceToFinish].').then(function (msg) {
+                                    hintEl.textContent = msg; hintEl.style.color = '#FDBA74'; btn.disabled = false;
+                                });
+                            });
+                    });
+                    actions.appendChild(btn);
+                    actions.appendChild(hintEl);
+                    body.appendChild(actions);
+                }
+
                 function loadTopTen(refresh) {
                     var list = document.querySelector('#RtfTopTen');
                     var note = document.querySelector('#RtfTopTenNote');
@@ -126,17 +236,24 @@
                         list.innerHTML = '';
                         note.textContent = data.definition + ' Using ' + (data.keySource || 'no TMDB key (none found in Jellyfin)') + '. ' + data.attribution;
                         data.years.forEach(function (y) {
-                            var li = document.createElement('li');
-                            li.textContent = y.label + ': checking…';
-                            list.appendChild(li);
+                            var card = el('details', 'rtfYear');
+                            card.setAttribute('data-year', y.year);
+                            card.open = !!openYears[y.year];
+                            card.addEventListener('toggle', function () { openYears[y.year] = card.open; });
+                            var summary = el('summary');
+                            summary.appendChild(el('span', 'rtfYearName', y.label));
+                            summary.appendChild(el('span', 'rtfFilmMeta', 'checking…'));
+                            card.appendChild(summary);
+                            card.appendChild(el('div', 'rtfBody'));
+                            list.appendChild(card);
                             ApiClient.getJSON(ApiClient.getUrl('RaceToFinish/Admin/TopTen/' + y.year, refresh ? { refresh: true } : {})).then(function (r) {
-                                li.textContent = (r.complete ? '✔ ' : '') + r.label + ': ' + r.onServerCount + ' of ' + r.movies.length + ' on your server';
-                                li.style.color = r.complete ? '#4ADE80' : '';
+                                renderYear(card, r);
                             }, function (err) {
-                                var show = function (msg) { li.textContent = '✖ ' + y.label + ': ' + msg; li.style.color = '#FDBA74'; };
-                                if (err && typeof err.json === 'function') {
-                                    err.json().then(function (b) { show(b.error || 'could not load'); }, function () { show('could not load'); });
-                                } else { show('could not load. Check the server log for [RaceToFinish].'); }
+                                errorText(err, 'could not load. Check the server log for [RaceToFinish].').then(function (msg) {
+                                    summary.lastChild.textContent = '✖ ' + msg;
+                                    summary.lastChild.className = 'rtfMissing';
+                                    card.querySelector('.rtfBody').textContent = msg;
+                                });
                             });
                         });
                     }, function () { list.textContent = 'Could not load the Top 5 lists. Check the server log for [RaceToFinish].'; });
