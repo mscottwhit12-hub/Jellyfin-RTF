@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.2.2.0",
+        "changelog": "Settings: open each Top 5 year to see its films and which are on your server or missing. Turn a year on once all its films are on your server (this locks the list); races open in the next update.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/mscottwhit12-hub/Jellyfin-RTF/releases/download/v0.2.2/race-to-finish_0.2.2.0.zip",
+        "checksum": "b93def8412d7267bed893078c136fbb4",
+        "timestamp": "2026-10-23T06:11:36Z"
+      },
+      {
         "version": "0.2.1.0",
         "changelog": "Ready-made Top 5 movie lists for 2020-2025 from TMDB, using the TMDB key Jellyfin already has (no setup). Settings page shows how many of each list are on your server. Not yet startable as challenges.",
         "targetAbi": "12.0.0.0",
