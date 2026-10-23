@@ -12,7 +12,7 @@
     <!-- One version number for everything. The release workflow passes
          -p:Version=X.Y.Z from the git tag. Jellyfin compares the assembly
          version with the manifest entry, so both must read X.Y.Z.0. -->
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
   </PropertyGroup>
@@ -37,6 +37,8 @@
     <EmbeddedResource Include="Configuration\configPage.html" />
     <None Remove="Web\**" />
     <EmbeddedResource Include="Web\**" />
+    <!-- Ready-made Top 10 lists, made from IMDb's data by build/build_imdb_lists.py. -->
+    <EmbeddedResource Include="TopTen\imdb-top10.json" LogicalName="Jellyfin.Plugin.RaceToFinish.TopTen.imdb-top10.json" />
   </ItemGroup>
 
 </Project>

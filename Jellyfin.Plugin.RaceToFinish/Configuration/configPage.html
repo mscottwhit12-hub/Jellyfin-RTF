@@ -24,6 +24,12 @@
                 Safe to run again. Imported history never counts toward races.</div>
                 <table id="RtfUsers" style="width:100%;margin:1.5em 0;border-collapse:collapse"></table>
 
+                <h3 class="sectionTitle">Ready-made Top 10 challenges</h3>
+                <p>The Top 10 movies of 2020 to 2025 from IMDb are built in. Nothing to set up.
+                A challenge can only start once every film in its list is on your server.</p>
+                <ul id="RtfTopTen" style="list-style:none;padding:0;line-height:2"></ul>
+                <div class="fieldDescription" id="RtfTopTenNote"></div>
+
                 <form id="RtfConfigForm">
                     <h3 class="sectionTitle">Look</h3>
                     <div class="checkboxContainer checkboxContainer-withDescription">
@@ -112,6 +118,26 @@
                     });
                 }
 
+                function loadTopTen() {
+                    var list = document.querySelector('#RtfTopTen');
+                    ApiClient.getJSON(ApiClient.getUrl('RaceToFinish/Admin/TopTen')).then(function (data) {
+                        list.innerHTML = '';
+                        data.years.forEach(function (y) {
+                            var li = document.createElement('li');
+                            if (!y.available) {
+                                li.textContent = y.label + ': not in this version';
+                                li.style.opacity = '.6';
+                            } else {
+                                li.textContent = (y.complete ? '✔ ' : '') + y.label + ': ' + y.onServerCount + ' of ' + y.total + ' on your server';
+                                if (y.complete) { li.style.color = '#4ADE80'; }
+                            }
+                            list.appendChild(li);
+                        });
+                        document.querySelector('#RtfTopTenNote').textContent = data.definition + ' ' +
+                            (data.listsMadeUtc ? 'Lists made ' + new Date(data.listsMadeUtc).toLocaleDateString() + '. ' : '') + data.attribution;
+                    }, function () { list.textContent = 'Could not load the Top 10 lists. Check the server log for [RaceToFinish].'; });
+                }
+
                 document.querySelector('#RtfImportBtn').addEventListener('click', function () {
                     var info = document.querySelector('#RtfImportInfo');
                     info.textContent = 'Importing…';
@@ -125,6 +151,7 @@
 
                 page.addEventListener('pageshow', function () {
                     loadHistory();
+                    loadTopTen();
                     Dashboard.showLoadingMsg();
                     runChecks();
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {

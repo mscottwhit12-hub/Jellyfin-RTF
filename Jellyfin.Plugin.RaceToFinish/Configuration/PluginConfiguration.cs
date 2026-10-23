@@ -2,9 +2,7 @@ using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.RaceToFinish.Configuration;
 
-/// <summary>
-/// Admin settings. v0.1 has only display options; challenges, Seerr and TMDB settings arrive in later versions.
-/// </summary>
+/// <summary>Admin settings.</summary>
 public class PluginConfiguration : BasePluginConfiguration
 {
     /// <summary>

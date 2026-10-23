@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.RaceToFinish.Data;
+using Jellyfin.Plugin.RaceToFinish.TopTen;
 using Jellyfin.Plugin.RaceToFinish.Tracking;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
@@ -19,5 +20,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddHostedService(provider => provider.GetRequiredService<WatchTracker>());
         serviceCollection.AddSingleton<HistoryImporter>();
         serviceCollection.AddHostedService<FirstRunImport>();
+        serviceCollection.AddSingleton<TopTenService>();
     }
 }
