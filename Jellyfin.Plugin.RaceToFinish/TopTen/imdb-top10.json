@@ -1,7 +1,913 @@
 {
   "source": "IMDb",
-  "generatedUtc": null,
+  "generatedUtc": "2026-10-23T03:53:09Z",
   "attribution": "Information courtesy of IMDb (https://www.imdb.com). Used with permission.",
-  "note": "Placeholder. Run the 'Update IMDb Top 10 lists' workflow to fill this in.",
-  "years": {}
+  "years": {
+    "2020": {
+      "minimumVotes": 100000,
+      "movies": [
+        {
+          "rank": 1,
+          "imdbId": "tt10189514",
+          "title": "Soorarai Pottru",
+          "originalTitle": null,
+          "year": 2020,
+          "runtimeMinutes": 153,
+          "genres": [
+            "Drama"
+          ],
+          "rating": 8.6,
+          "votes": 133290
+        },
+        {
+          "rank": 2,
+          "imdbId": "tt8503618",
+          "title": "Hamilton",
+          "originalTitle": null,
+          "year": 2020,
+          "runtimeMinutes": 160,
+          "genres": [
+            "Biography",
+            "Drama",
+            "History"
+          ],
+          "rating": 8.3,
+          "votes": 143646
+        },
+        {
+          "rank": 3,
+          "imdbId": "tt8110330",
+          "title": "Dil Bechara",
+          "originalTitle": null,
+          "year": 2020,
+          "runtimeMinutes": 101,
+          "genres": [
+            "Comedy",
+            "Drama",
+            "Romance"
+          ],
+          "rating": 8.3,
+          "votes": 138948
+        },
+        {
+          "rank": 4,
+          "imdbId": "tt10272386",
+          "title": "The Father",
+          "originalTitle": null,
+          "year": 2020,
+          "runtimeMinutes": 97,
+          "genres": [
+            "Drama",
+            "Mystery"
+          ],
+          "rating": 8.2,
+          "votes": 251199
+        },
+        {
+          "rank": 5,
+          "imdbId": "tt11032374",
+          "title": "Demon Slayer: Kimetsu no Yaiba - The Movie: Mugen Train",
+          "originalTitle": "Gekijô-ban Kimetsu no Yaiba Mugen Ressha-hen",
+          "year": 2020,
+          "runtimeMinutes": 117,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Animation"
+          ],
+          "rating": 8.2,
+          "votes": 103932
+        },
+        {
+          "rank": 6,
+          "imdbId": "tt2948372",
+          "title": "Soul",
+          "originalTitle": null,
+          "year": 2020,
+          "runtimeMinutes": 100,
+          "genres": [
+            "Adventure",
+            "Animation",
+            "Comedy"
+          ],
+          "rating": 8.0,
+          "votes": 460084
+        },
+        {
+          "rank": 7,
+          "imdbId": "tt10288566",
+          "title": "Another Round",
+          "originalTitle": "Druk",
+          "year": 2020,
+          "runtimeMinutes": 117,
+          "genres": [
+            "Comedy",
+            "Drama"
+          ],
+          "rating": 7.7,
+          "votes": 232032
+        },
+        {
+          "rank": 8,
+          "imdbId": "tt1070874",
+          "title": "The Trial of the Chicago 7",
+          "originalTitle": null,
+          "year": 2020,
+          "runtimeMinutes": 129,
+          "genres": [
+            "Drama",
+            "History",
+            "Thriller"
+          ],
+          "rating": 7.7,
+          "votes": 207831
+        },
+        {
+          "rank": 9,
+          "imdbId": "tt9620292",
+          "title": "Promising Young Woman",
+          "originalTitle": null,
+          "year": 2020,
+          "runtimeMinutes": 113,
+          "genres": [
+            "Crime",
+            "Drama",
+            "Mystery"
+          ],
+          "rating": 7.5,
+          "votes": 260976
+        },
+        {
+          "rank": 10,
+          "imdbId": "tt9484998",
+          "title": "Palm Springs",
+          "originalTitle": null,
+          "year": 2020,
+          "runtimeMinutes": 90,
+          "genres": [
+            "Comedy",
+            "Fantasy",
+            "Mystery"
+          ],
+          "rating": 7.4,
+          "votes": 220379
+        }
+      ]
+    },
+    "2021": {
+      "minimumVotes": 100000,
+      "movies": [
+        {
+          "rank": 1,
+          "imdbId": "tt15097216",
+          "title": "Jai Bhim",
+          "originalTitle": null,
+          "year": 2021,
+          "runtimeMinutes": 164,
+          "genres": [
+            "Crime",
+            "Drama"
+          ],
+          "rating": 8.6,
+          "votes": 237034
+        },
+        {
+          "rank": 2,
+          "imdbId": "tt10295212",
+          "title": "Shershaah",
+          "originalTitle": null,
+          "year": 2021,
+          "runtimeMinutes": 135,
+          "genres": [
+            "Action",
+            "Biography",
+            "Drama"
+          ],
+          "rating": 8.3,
+          "votes": 137833
+        },
+        {
+          "rank": 3,
+          "imdbId": "tt10872600",
+          "title": "Spider-Man: No Way Home",
+          "originalTitle": null,
+          "year": 2021,
+          "runtimeMinutes": 148,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Fantasy"
+          ],
+          "rating": 8.1,
+          "votes": 1083377
+        },
+        {
+          "rank": 4,
+          "imdbId": "tt1160419",
+          "title": "Dune",
+          "originalTitle": "Dune: Part One",
+          "year": 2021,
+          "runtimeMinutes": 155,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Drama"
+          ],
+          "rating": 8.0,
+          "votes": 1096968
+        },
+        {
+          "rank": 5,
+          "imdbId": "tt10366460",
+          "title": "CODA",
+          "originalTitle": null,
+          "year": 2021,
+          "runtimeMinutes": 111,
+          "genres": [
+            "Comedy",
+            "Drama",
+            "Music"
+          ],
+          "rating": 8.0,
+          "votes": 233955
+        },
+        {
+          "rank": 6,
+          "imdbId": "tt12361974",
+          "title": "Zack Snyder's Justice League",
+          "originalTitle": null,
+          "year": 2021,
+          "runtimeMinutes": 242,
+          "genres": [
+            "Adventure",
+            "Fantasy",
+            "Sci-Fi"
+          ],
+          "rating": 7.9,
+          "votes": 481939
+        },
+        {
+          "rank": 7,
+          "imdbId": "tt10370710",
+          "title": "The Worst Person in the World",
+          "originalTitle": "Verdens verste menneske",
+          "year": 2021,
+          "runtimeMinutes": 128,
+          "genres": [
+            "Comedy",
+            "Drama",
+            "Romance"
+          ],
+          "rating": 7.7,
+          "votes": 133550
+        },
+        {
+          "rank": 8,
+          "imdbId": "tt7979580",
+          "title": "The Mitchells vs. the Machines",
+          "originalTitle": "The Mitchells vs the Machines",
+          "year": 2021,
+          "runtimeMinutes": 114,
+          "genres": [
+            "Adventure",
+            "Animation",
+            "Comedy"
+          ],
+          "rating": 7.6,
+          "votes": 145573
+        },
+        {
+          "rank": 9,
+          "imdbId": "tt9389998",
+          "title": "Pushpa: The Rise - Part 1",
+          "originalTitle": null,
+          "year": 2021,
+          "runtimeMinutes": 179,
+          "genres": [
+            "Action",
+            "Crime",
+            "Drama"
+          ],
+          "rating": 7.6,
+          "votes": 102015
+        },
+        {
+          "rank": 10,
+          "imdbId": "tt9620288",
+          "title": "King Richard",
+          "originalTitle": null,
+          "year": 2021,
+          "runtimeMinutes": 144,
+          "genres": [
+            "Biography",
+            "Drama",
+            "Sport"
+          ],
+          "rating": 7.5,
+          "votes": 194232
+        }
+      ]
+    },
+    "2022": {
+      "minimumVotes": 100000,
+      "movies": [
+        {
+          "rank": 1,
+          "imdbId": "tt10811166",
+          "title": "The Kashmir Files",
+          "originalTitle": null,
+          "year": 2022,
+          "runtimeMinutes": 170,
+          "genres": [
+            "Drama"
+          ],
+          "rating": 8.4,
+          "votes": 580124
+        },
+        {
+          "rank": 2,
+          "imdbId": "tt1745960",
+          "title": "Top Gun: Maverick",
+          "originalTitle": null,
+          "year": 2022,
+          "runtimeMinutes": 130,
+          "genres": [
+            "Action",
+            "Drama"
+          ],
+          "rating": 8.2,
+          "votes": 910388
+        },
+        {
+          "rank": 3,
+          "imdbId": "tt10698680",
+          "title": "K.G.F: Chapter 2",
+          "originalTitle": null,
+          "year": 2022,
+          "runtimeMinutes": 166,
+          "genres": [
+            "Action",
+            "Crime",
+            "Drama"
+          ],
+          "rating": 8.2,
+          "votes": 173547
+        },
+        {
+          "rank": 4,
+          "imdbId": "tt15327088",
+          "title": "Kantara",
+          "originalTitle": null,
+          "year": 2022,
+          "runtimeMinutes": 148,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Drama"
+          ],
+          "rating": 8.1,
+          "votes": 119016
+        },
+        {
+          "rank": 5,
+          "imdbId": "tt3915174",
+          "title": "Puss in Boots: The Last Wish",
+          "originalTitle": null,
+          "year": 2022,
+          "runtimeMinutes": 102,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Animation"
+          ],
+          "rating": 7.9,
+          "votes": 233192
+        },
+        {
+          "rank": 6,
+          "imdbId": "tt1877830",
+          "title": "The Batman",
+          "originalTitle": null,
+          "year": 2022,
+          "runtimeMinutes": 176,
+          "genres": [
+            "Action",
+            "Crime",
+            "Mystery"
+          ],
+          "rating": 7.8,
+          "votes": 954262
+        },
+        {
+          "rank": 7,
+          "imdbId": "tt1016150",
+          "title": "All Quiet on the Western Front",
+          "originalTitle": "Im Westen nichts Neues",
+          "year": 2022,
+          "runtimeMinutes": 148,
+          "genres": [
+            "Drama",
+            "War"
+          ],
+          "rating": 7.8,
+          "votes": 348662
+        },
+        {
+          "rank": 8,
+          "imdbId": "tt8178634",
+          "title": "RRR",
+          "originalTitle": "RRR (Rise Roar Revolt)",
+          "year": 2022,
+          "runtimeMinutes": 187,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Drama"
+          ],
+          "rating": 7.8,
+          "votes": 228154
+        },
+        {
+          "rank": 9,
+          "imdbId": "tt6710474",
+          "title": "Everything Everywhere All at Once",
+          "originalTitle": null,
+          "year": 2022,
+          "runtimeMinutes": 139,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Comedy"
+          ],
+          "rating": 7.7,
+          "votes": 664334
+        },
+        {
+          "rank": 10,
+          "imdbId": "tt13833688",
+          "title": "The Whale",
+          "originalTitle": null,
+          "year": 2022,
+          "runtimeMinutes": 117,
+          "genres": [
+            "Drama"
+          ],
+          "rating": 7.6,
+          "votes": 311924
+        }
+      ]
+    },
+    "2023": {
+      "minimumVotes": 100000,
+      "movies": [
+        {
+          "rank": 1,
+          "imdbId": "tt23849204",
+          "title": "12th Fail",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 147,
+          "genres": [
+            "Biography",
+            "Drama"
+          ],
+          "rating": 8.7,
+          "votes": 178948
+        },
+        {
+          "rank": 2,
+          "imdbId": "tt9362722",
+          "title": "Spider-Man: Across the Spider-Verse",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 140,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Animation"
+          ],
+          "rating": 8.5,
+          "votes": 559308
+        },
+        {
+          "rank": 3,
+          "imdbId": "tt15398776",
+          "title": "Oppenheimer",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 180,
+          "genres": [
+            "Biography",
+            "Drama",
+            "History"
+          ],
+          "rating": 8.2,
+          "votes": 1107249
+        },
+        {
+          "rank": 4,
+          "imdbId": "tt6791350",
+          "title": "Guardians of the Galaxy Vol. 3",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 150,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Comedy"
+          ],
+          "rating": 7.9,
+          "votes": 491448
+        },
+        {
+          "rank": 5,
+          "imdbId": "tt14849194",
+          "title": "The Holdovers",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 133,
+          "genres": [
+            "Comedy",
+            "Drama"
+          ],
+          "rating": 7.9,
+          "votes": 275364
+        },
+        {
+          "rank": 6,
+          "imdbId": "tt27503384",
+          "title": "Perfect Days",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 124,
+          "genres": [
+            "Drama"
+          ],
+          "rating": 7.9,
+          "votes": 113747
+        },
+        {
+          "rank": 7,
+          "imdbId": "tt13238346",
+          "title": "Past Lives",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 105,
+          "genres": [
+            "Drama",
+            "Romance"
+          ],
+          "rating": 7.8,
+          "votes": 179328
+        },
+        {
+          "rank": 8,
+          "imdbId": "tt16277242",
+          "title": "Society of the Snow",
+          "originalTitle": "La sociedad de la nieve",
+          "year": 2023,
+          "runtimeMinutes": 144,
+          "genres": [
+            "Adventure",
+            "Biography",
+            "Drama"
+          ],
+          "rating": 7.8,
+          "votes": 178997
+        },
+        {
+          "rank": 9,
+          "imdbId": "tt14230458",
+          "title": "Poor Things",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 141,
+          "genres": [
+            "Comedy",
+            "Drama",
+            "Romance"
+          ],
+          "rating": 7.7,
+          "votes": 426119
+        },
+        {
+          "rank": 10,
+          "imdbId": "tt10366206",
+          "title": "John Wick: Chapter 4",
+          "originalTitle": null,
+          "year": 2023,
+          "runtimeMinutes": 169,
+          "genres": [
+            "Action",
+            "Crime",
+            "Thriller"
+          ],
+          "rating": 7.6,
+          "votes": 421637
+        }
+      ]
+    },
+    "2024": {
+      "minimumVotes": 100000,
+      "movies": [
+        {
+          "rank": 1,
+          "imdbId": "tt15239678",
+          "title": "Dune: Part Two",
+          "originalTitle": null,
+          "year": 2024,
+          "runtimeMinutes": 166,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Drama"
+          ],
+          "rating": 8.4,
+          "votes": 800732
+        },
+        {
+          "rank": 2,
+          "imdbId": "tt29623480",
+          "title": "The Wild Robot",
+          "originalTitle": null,
+          "year": 2024,
+          "runtimeMinutes": 102,
+          "genres": [
+            "Adventure",
+            "Animation",
+            "Family"
+          ],
+          "rating": 8.1,
+          "votes": 240667
+        },
+        {
+          "rank": 3,
+          "imdbId": "tt14961016",
+          "title": "I'm Still Here",
+          "originalTitle": "Ainda Estou Aqui",
+          "year": 2024,
+          "runtimeMinutes": 137,
+          "genres": [
+            "Biography",
+            "Drama",
+            "History"
+          ],
+          "rating": 8.1,
+          "votes": 172556
+        },
+        {
+          "rank": 4,
+          "imdbId": "tt4772188",
+          "title": "Flow",
+          "originalTitle": "Straume",
+          "year": 2024,
+          "runtimeMinutes": 85,
+          "genres": [
+            "Adventure",
+            "Animation",
+            "Family"
+          ],
+          "rating": 7.8,
+          "votes": 154781
+        },
+        {
+          "rank": 5,
+          "imdbId": "tt6263850",
+          "title": "Deadpool & Wolverine",
+          "originalTitle": null,
+          "year": 2024,
+          "runtimeMinutes": 128,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Comedy"
+          ],
+          "rating": 7.5,
+          "votes": 599111
+        },
+        {
+          "rank": 6,
+          "imdbId": "tt22022452",
+          "title": "Inside Out 2",
+          "originalTitle": null,
+          "year": 2024,
+          "runtimeMinutes": 96,
+          "genres": [
+            "Adventure",
+            "Animation",
+            "Comedy"
+          ],
+          "rating": 7.5,
+          "votes": 262492
+        },
+        {
+          "rank": 7,
+          "imdbId": "tt12037194",
+          "title": "Furiosa: A Mad Max Saga",
+          "originalTitle": null,
+          "year": 2024,
+          "runtimeMinutes": 148,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Sci-Fi"
+          ],
+          "rating": 7.4,
+          "votes": 329307
+        },
+        {
+          "rank": 8,
+          "imdbId": "tt28607951",
+          "title": "Anora",
+          "originalTitle": null,
+          "year": 2024,
+          "runtimeMinutes": 139,
+          "genres": [
+            "Comedy",
+            "Drama",
+            "Romance"
+          ],
+          "rating": 7.4,
+          "votes": 312036
+        },
+        {
+          "rank": 9,
+          "imdbId": "tt20215234",
+          "title": "Conclave",
+          "originalTitle": null,
+          "year": 2024,
+          "runtimeMinutes": 120,
+          "genres": [
+            "Drama",
+            "Thriller"
+          ],
+          "rating": 7.4,
+          "votes": 289971
+        },
+        {
+          "rank": 10,
+          "imdbId": "tt1262426",
+          "title": "Wicked",
+          "originalTitle": null,
+          "year": 2024,
+          "runtimeMinutes": 160,
+          "genres": [
+            "Fantasy",
+            "Musical",
+            "Romance"
+          ],
+          "rating": 7.3,
+          "votes": 259057
+        }
+      ]
+    },
+    "2025": {
+      "minimumVotes": 100000,
+      "movies": [
+        {
+          "rank": 1,
+          "imdbId": "tt33014583",
+          "title": "Dhurandhar",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 214,
+          "genres": [
+            "Action",
+            "Crime",
+            "Thriller"
+          ],
+          "rating": 8.2,
+          "votes": 152389
+        },
+        {
+          "rank": 2,
+          "imdbId": "tt37287335",
+          "title": "Obsession",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 109,
+          "genres": [
+            "Fantasy",
+            "Horror",
+            "Thriller"
+          ],
+          "rating": 7.8,
+          "votes": 407455
+        },
+        {
+          "rank": 3,
+          "imdbId": "tt14905854",
+          "title": "Hamnet",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 125,
+          "genres": [
+            "Biography",
+            "Drama",
+            "History"
+          ],
+          "rating": 7.8,
+          "votes": 139784
+        },
+        {
+          "rank": 4,
+          "imdbId": "tt26743210",
+          "title": "How to Train Your Dragon",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 125,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Comedy"
+          ],
+          "rating": 7.7,
+          "votes": 143075
+        },
+        {
+          "rank": 5,
+          "imdbId": "tt30144839",
+          "title": "One Battle After Another",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 161,
+          "genres": [
+            "Crime",
+            "Thriller"
+          ],
+          "rating": 7.6,
+          "votes": 453155
+        },
+        {
+          "rank": 6,
+          "imdbId": "tt16311594",
+          "title": "F1: The Movie",
+          "originalTitle": "F1",
+          "year": 2025,
+          "runtimeMinutes": 155,
+          "genres": [
+            "Drama",
+            "Sport"
+          ],
+          "rating": 7.6,
+          "votes": 398095
+        },
+        {
+          "rank": 7,
+          "imdbId": "tt31193180",
+          "title": "Sinners",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 137,
+          "genres": [
+            "Horror"
+          ],
+          "rating": 7.5,
+          "votes": 534965
+        },
+        {
+          "rank": 8,
+          "imdbId": "tt32916440",
+          "title": "Marty Supreme",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 149,
+          "genres": [
+            "Comedy",
+            "Drama",
+            "Sport"
+          ],
+          "rating": 7.5,
+          "votes": 226022
+        },
+        {
+          "rank": 9,
+          "imdbId": "tt29768334",
+          "title": "Train Dreams",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 102,
+          "genres": [
+            "Drama"
+          ],
+          "rating": 7.5,
+          "votes": 117838
+        },
+        {
+          "rank": 10,
+          "imdbId": "tt26581740",
+          "title": "Weapons",
+          "originalTitle": null,
+          "year": 2025,
+          "runtimeMinutes": 128,
+          "genres": [
+            "Horror",
+            "Mystery"
+          ],
+          "rating": 7.4,
+          "votes": 414219
+        }
+      ]
+    }
+  }
 }
