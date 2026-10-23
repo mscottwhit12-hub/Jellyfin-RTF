@@ -61,17 +61,6 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           { echo 'notes<<NOTES_EOF'; echo "$NOTES"; echo 'NOTES_EOF'; } >> "$GITHUB_OUTPUT"
 
-      - name: Check the built-in Top 10 lists
-        run: |
-          python3 - <<'PY'
-          import json, sys
-          data = json.load(open("Jellyfin.Plugin.RaceToFinish/TopTen/imdb-top10.json"))
-          missing = [y for y in range(2020, 2026) if len(data.get("years", {}).get(str(y), {}).get("movies", [])) != 10]
-          if missing:
-              sys.exit(f"Top 10 lists missing or short for {missing}. Run 'Update IMDb Top 10 lists' and merge the imdb-lists branch first.")
-          print("Top 10 lists OK, made", data.get("generatedUtc"))
-          PY
-
       - name: Build
         run: |
           node --check Jellyfin.Plugin.RaceToFinish/Web/rtf.js

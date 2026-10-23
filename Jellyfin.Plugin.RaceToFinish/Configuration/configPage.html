@@ -25,9 +25,10 @@
                 <table id="RtfUsers" style="width:100%;margin:1.5em 0;border-collapse:collapse"></table>
 
                 <h3 class="sectionTitle">Ready-made Top 10 challenges</h3>
-                <p>The Top 10 movies of 2020 to 2025 from IMDb are built in. Nothing to set up.
+                <p>The Top 10 movies of 2020 to 2025 come from TMDB, using the TMDB key Jellyfin already has. Nothing to set up.
                 A challenge can only start once every film in its list is on your server.</p>
                 <ul id="RtfTopTen" style="list-style:none;padding:0;line-height:2"></ul>
+                <button is="emby-button" type="button" id="RtfTopTenRefresh" class="raised emby-button"><span>Refresh lists</span></button>
                 <div class="fieldDescription" id="RtfTopTenNote"></div>
 
                 <form id="RtfConfigForm">
@@ -118,25 +119,30 @@
                     });
                 }
 
-                function loadTopTen() {
+                function loadTopTen(refresh) {
                     var list = document.querySelector('#RtfTopTen');
+                    var note = document.querySelector('#RtfTopTenNote');
                     ApiClient.getJSON(ApiClient.getUrl('RaceToFinish/Admin/TopTen')).then(function (data) {
                         list.innerHTML = '';
+                        note.textContent = data.definition + ' Using ' + (data.keySource || 'no TMDB key (none found in Jellyfin)') + '. ' + data.attribution;
                         data.years.forEach(function (y) {
                             var li = document.createElement('li');
-                            if (!y.available) {
-                                li.textContent = y.label + ': not in this version';
-                                li.style.opacity = '.6';
-                            } else {
-                                li.textContent = (y.complete ? '✔ ' : '') + y.label + ': ' + y.onServerCount + ' of ' + y.total + ' on your server';
-                                if (y.complete) { li.style.color = '#4ADE80'; }
-                            }
+                            li.textContent = y.label + ': checking…';
                             list.appendChild(li);
+                            ApiClient.getJSON(ApiClient.getUrl('RaceToFinish/Admin/TopTen/' + y.year, refresh ? { refresh: true } : {})).then(function (r) {
+                                li.textContent = (r.complete ? '✔ ' : '') + r.label + ': ' + r.onServerCount + ' of ' + r.movies.length + ' on your server';
+                                li.style.color = r.complete ? '#4ADE80' : '';
+                            }, function (err) {
+                                var show = function (msg) { li.textContent = '✖ ' + y.label + ': ' + msg; li.style.color = '#FDBA74'; };
+                                if (err && typeof err.json === 'function') {
+                                    err.json().then(function (b) { show(b.error || 'could not load'); }, function () { show('could not load'); });
+                                } else { show('could not load. Check the server log for [RaceToFinish].'); }
+                            });
                         });
-                        document.querySelector('#RtfTopTenNote').textContent = data.definition + ' ' +
-                            (data.listsMadeUtc ? 'Lists made ' + new Date(data.listsMadeUtc).toLocaleDateString() + '. ' : '') + data.attribution;
                     }, function () { list.textContent = 'Could not load the Top 10 lists. Check the server log for [RaceToFinish].'; });
                 }
+
+                document.querySelector('#RtfTopTenRefresh').addEventListener('click', function () { loadTopTen(true); });
 
                 document.querySelector('#RtfImportBtn').addEventListener('click', function () {
                     var info = document.querySelector('#RtfImportInfo');

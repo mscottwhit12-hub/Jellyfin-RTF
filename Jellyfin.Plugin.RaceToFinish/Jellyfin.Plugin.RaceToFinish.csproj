@@ -37,8 +37,6 @@
     <EmbeddedResource Include="Configuration\configPage.html" />
     <None Remove="Web\**" />
     <EmbeddedResource Include="Web\**" />
-    <!-- Ready-made Top 10 lists, made from IMDb's data by build/build_imdb_lists.py. -->
-    <EmbeddedResource Include="TopTen\imdb-top10.json" LogicalName="Jellyfin.Plugin.RaceToFinish.TopTen.imdb-top10.json" />
   </ItemGroup>
 
 </Project>

@@ -10,4 +10,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Turn off if a TV struggles with it; a solid panel is used instead.
     /// </summary>
     public bool UseBlur { get; set; } = true;
+
+    /// <summary>Gets or sets the TMDB API address. Not shown in settings; only changed for testing.</summary>
+    public string TmdbApiBaseUrl { get; set; } = "https://api.themoviedb.org/3";
 }

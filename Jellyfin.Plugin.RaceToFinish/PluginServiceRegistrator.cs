@@ -20,6 +20,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddHostedService(provider => provider.GetRequiredService<WatchTracker>());
         serviceCollection.AddSingleton<HistoryImporter>();
         serviceCollection.AddHostedService<FirstRunImport>();
+        serviceCollection.AddSingleton<TmdbClient>();
         serviceCollection.AddSingleton<TopTenService>();
     }
 }

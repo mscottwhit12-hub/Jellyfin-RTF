@@ -1,8 +1,6 @@
+using System.Collections.Concurrent;
 using System.Globalization;
-using System.Reflection;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
@@ -17,23 +15,26 @@ public sealed class TopTenEntry
     /// <summary>Gets or sets the rank, 1 to 10.</summary>
     public int Rank { get; set; }
 
-    /// <summary>Gets or sets the IMDb ID, e.g. tt1234567.</summary>
-    public string ImdbId { get; set; } = string.Empty;
+    /// <summary>Gets or sets the TMDB ID.</summary>
+    public int TmdbId { get; set; }
 
     /// <summary>Gets or sets the title.</summary>
     public string Title { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the release year.</summary>
-    public int Year { get; set; }
+    public int? Year { get; set; }
 
-    /// <summary>Gets or sets IMDb's rating when the list was made.</summary>
+    /// <summary>Gets or sets the release date.</summary>
+    public string? ReleaseDate { get; set; }
+
+    /// <summary>Gets or sets TMDB's average rating.</summary>
     public double Rating { get; set; }
 
-    /// <summary>Gets or sets IMDb's vote count when the list was made.</summary>
+    /// <summary>Gets or sets TMDB's vote count.</summary>
     public int Votes { get; set; }
 
-    /// <summary>Gets or sets the running time in minutes.</summary>
-    public int? RuntimeMinutes { get; set; }
+    /// <summary>Gets or sets the poster image address on TMDB, if any.</summary>
+    public string? PosterUrl { get; set; }
 
     /// <summary>Gets or sets a value indicating whether the server has this film.</summary>
     public bool OnServer { get; set; }
@@ -41,7 +42,7 @@ public sealed class TopTenEntry
     /// <summary>Gets or sets the Jellyfin item ID when on the server.</summary>
     public string? ItemId { get; set; }
 
-    /// <summary>Gets or sets how it was matched: "imdb" (exact ID) or "title" (title and year).</summary>
+    /// <summary>Gets or sets how it was matched: "tmdb" (exact ID) or "title" (title and year).</summary>
     public string? MatchedBy { get; set; }
 }
 
@@ -51,11 +52,17 @@ public sealed class TopTenList
     /// <summary>Gets or sets the year.</summary>
     public int Year { get; set; }
 
-    /// <summary>Gets or sets the display name, e.g. "Top 10 of 2023 (IMDb)".</summary>
+    /// <summary>Gets or sets the display name, e.g. "Top 10 of 2023 (TMDB)".</summary>
     public string Label { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a plain-language description of how the list is made.</summary>
+    public string Definition { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the vote minimum actually used for this year.</summary>
     public int MinimumVotes { get; set; }
+
+    /// <summary>Gets or sets when TMDB was asked, UTC.</summary>
+    public DateTime FetchedUtc { get; set; }
 
     /// <summary>Gets or sets the films, best first.</summary>
     public List<TopTenEntry> Movies { get; set; } = [];
@@ -68,174 +75,150 @@ public sealed class TopTenList
 }
 
 /// <summary>
-/// The ready-made "Top 10 movies of a year" lists. They're built from IMDb's official data files by
-/// build/build_imdb_lists.py (run by the "Update IMDb Top 10 lists" GitHub workflow) and shipped inside the
-/// plugin, so they need no API key and no internet access. This class only reads them and checks them against
-/// the library.
+/// The ready-made "Top 10 movies of a year" lists.
+///
+/// How a list is made: movies whose primary release is in that year, sorted by TMDB rating, best first. To keep
+/// obscure films with a handful of votes out, a film needs at least 1,000 votes; if a year has fewer than 10 such
+/// films the minimum steps down to 500, then 200. Documentaries and TV movies are left out (this keeps concert
+/// films and TV specials out), and so are films under an hour. Adult titles are never included.
+/// Lists are kept for a day so previews don't hit TMDB every time; a challenge freezes its own copy when it starts.
 /// </summary>
 public class TopTenService
 {
     /// <summary>The years offered as ready-made challenges.</summary>
     public static readonly IReadOnlyList<int> PresetYears = [2020, 2021, 2022, 2023, 2024, 2025];
 
-    /// <summary>Plain-language description shown to admins. Keep in step with build_imdb_lists.py.</summary>
+    /// <summary>Plain-language description shown to admins.</summary>
     public const string DefinitionText =
-        "The 10 highest-rated feature films on IMDb first released that year, among films with at least 100,000 votes " +
+        "The 10 highest-rated movies on TMDB first released that year, among films with at least 1,000 votes " +
         "(fewer if a year doesn't have 10 such films). Documentaries, TV movies and films under an hour are left out.";
 
-    /// <summary>IMDb's required credit line.</summary>
-    public const string Attribution = "Information courtesy of IMDb (https://www.imdb.com). Used with permission.";
+    private const int ListSize = 10;
+    private const string DocumentaryGenre = "99";
+    private const string TvMovieGenre = "10770";
+    private const string PosterBase = "https://image.tmdb.org/t/p/w342";
+    private static readonly int[] VoteSteps = [1000, 500, 200];
+    private static readonly TimeSpan CacheFor = TimeSpan.FromHours(24);
 
-    private const string ResourceName = "Jellyfin.Plugin.RaceToFinish.TopTen.imdb-top10.json";
-
+    private readonly TmdbClient _tmdb;
     private readonly ILibraryManager _libraryManager;
-    private readonly ShippedLists _lists;
+    private readonly ILogger<TopTenService> _logger;
+    private readonly ConcurrentDictionary<int, (DateTime FetchedUtc, int MinimumVotes, List<TmdbMovie> Movies)> _cache = new();
 
     /// <summary>Initializes a new instance of the <see cref="TopTenService"/> class.</summary>
+    /// <param name="tmdb">TMDB client.</param>
     /// <param name="libraryManager">Library manager.</param>
     /// <param name="logger">Logger.</param>
-    public TopTenService(ILibraryManager libraryManager, ILogger<TopTenService> logger)
+    public TopTenService(TmdbClient tmdb, ILibraryManager libraryManager, ILogger<TopTenService> logger)
     {
+        _tmdb = tmdb;
         _libraryManager = libraryManager;
-        _lists = Load(logger);
+        _logger = logger;
     }
-
-    /// <summary>Gets when the shipped lists were made from IMDb's data, UTC, if known.</summary>
-    public DateTime? GeneratedUtc => _lists.GeneratedUtc;
 
     /// <summary>Display name for a year's list.</summary>
     /// <param name="year">Year.</param>
     /// <returns>Label.</returns>
-    public static string LabelFor(int year) => string.Create(CultureInfo.InvariantCulture, $"Top 10 of {year} (IMDb)");
+    public static string LabelFor(int year) => string.Create(CultureInfo.InvariantCulture, $"Top 10 of {year} (TMDB)");
 
-    /// <summary>Whether this build of the plugin has a list for the year.</summary>
-    /// <param name="year">Year.</param>
-    /// <returns>True if available.</returns>
-    public bool Has(int year) => _lists.Years.TryGetValue(year.ToString(CultureInfo.InvariantCulture), out var y) && y.Movies.Count > 0;
+    /// <summary>Forgets cached lists, so the next request asks TMDB again (e.g. after changing the key).</summary>
+    public void ClearCache() => _cache.Clear();
 
-    /// <summary>Gets a year's Top 10, matched against the library. Null if this build has no list for that year.</summary>
+    /// <summary>Gets a year's Top 10, matched against the library.</summary>
     /// <param name="year">One of <see cref="PresetYears"/>.</param>
-    /// <returns>The list, or null.</returns>
-    public TopTenList? GetList(int year) => GetLists([year]).FirstOrDefault();
-
-    /// <summary>Gets several years' lists, matching against the library once.</summary>
-    /// <param name="years">Years.</param>
-    /// <returns>The lists this build has, in the order asked.</returns>
-    public IReadOnlyList<TopTenList> GetLists(IEnumerable<int> years)
+    /// <param name="refresh">True to ask TMDB again even if a recent copy is cached.</param>
+    /// <param name="cancellationToken">Cancellation.</param>
+    /// <returns>The list.</returns>
+    public async Task<TopTenList> GetListAsync(int year, bool refresh, CancellationToken cancellationToken)
     {
-        var wanted = years.Where(y => PresetYears.Contains(y) && Has(y)).ToList();
-        if (wanted.Count == 0)
+        if (!PresetYears.Contains(year))
         {
-            return [];
+            throw new ArgumentOutOfRangeException(nameof(year), year, "Not one of the ready-made years.");
+        }
+
+        if (refresh || !_cache.TryGetValue(year, out var cached) || DateTime.UtcNow - cached.FetchedUtc > CacheFor)
+        {
+            cached = await FetchAsync(year, cancellationToken).ConfigureAwait(false);
+            _cache[year] = cached;
         }
 
         var library = LibraryIndex.Build(_libraryManager);
-        return wanted.Select(year =>
+        var list = new TopTenList
         {
-            ShippedYear shipped = _lists.Years[year.ToString(CultureInfo.InvariantCulture)];
-            var list = new TopTenList { Year = year, Label = LabelFor(year), MinimumVotes = shipped.MinimumVotes };
-            foreach (ShippedMovie movie in shipped.Movies.OrderBy(m => m.Rank))
+            Year = year,
+            Label = LabelFor(year),
+            Definition = DefinitionText,
+            MinimumVotes = cached.MinimumVotes,
+            FetchedUtc = cached.FetchedUtc,
+        };
+
+        int rank = 1;
+        foreach (TmdbMovie movie in cached.Movies)
+        {
+            (BaseItem? item, string? how) = library.Find(movie);
+            list.Movies.Add(new TopTenEntry
             {
-                (BaseItem? item, string? how) = library.Find(movie);
-                list.Movies.Add(new TopTenEntry
-                {
-                    Rank = movie.Rank,
-                    ImdbId = movie.ImdbId,
-                    Title = movie.Title,
-                    Year = movie.Year,
-                    Rating = movie.Rating,
-                    Votes = movie.Votes,
-                    RuntimeMinutes = movie.RuntimeMinutes,
-                    OnServer = item is not null,
-                    ItemId = item?.Id.ToString("N", CultureInfo.InvariantCulture),
-                    MatchedBy = how,
-                });
-            }
-
-            return list;
-        }).ToList();
-    }
-
-    private static ShippedLists Load(ILogger logger)
-    {
-        try
-        {
-            using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(ResourceName);
-            if (stream is not null)
-            {
-                ShippedLists? lists = JsonSerializer.Deserialize<ShippedLists>(stream);
-                if (lists is not null)
-                {
-                    lists.Years ??= [];
-                    foreach (ShippedYear year in lists.Years.Values)
-                    {
-                        year.Movies ??= [];
-                    }
-
-                    return lists;
-                }
-            }
-
-            logger.LogWarning("[RaceToFinish] The built-in Top 10 lists are missing from this build");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "[RaceToFinish] Could not read the built-in Top 10 lists");
+                Rank = rank++,
+                TmdbId = movie.Id,
+                Title = movie.Title,
+                Year = movie.Year,
+                ReleaseDate = movie.ReleaseDate,
+                Rating = Math.Round(movie.VoteAverage, 1),
+                Votes = movie.VoteCount,
+                PosterUrl = string.IsNullOrEmpty(movie.PosterPath) ? null : PosterBase + movie.PosterPath,
+                OnServer = item is not null,
+                ItemId = item?.Id.ToString("N", CultureInfo.InvariantCulture),
+                MatchedBy = how,
+            });
         }
 
-        return new ShippedLists();
+        return list;
     }
 
-    // The shape written by build/build_imdb_lists.py.
-    private sealed class ShippedLists
+    private async Task<(DateTime, int, List<TmdbMovie>)> FetchAsync(int year, CancellationToken cancellationToken)
     {
-        [JsonPropertyName("generatedUtc")]
-        public DateTime? GeneratedUtc { get; set; }
+        List<TmdbMovie> best = [];
+        int used = VoteSteps[^1];
+        foreach (int minimumVotes in VoteSteps)
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                ["primary_release_year"] = year.ToString(CultureInfo.InvariantCulture),
+                ["sort_by"] = "vote_average.desc",
+                ["vote_count.gte"] = minimumVotes.ToString(CultureInfo.InvariantCulture),
+                ["without_genres"] = DocumentaryGenre + "," + TvMovieGenre,
+                ["with_runtime.gte"] = "60",
+                ["include_adult"] = "false",
+                ["include_video"] = "false",
+                ["language"] = "en-US",
+                ["page"] = "1",
+            };
 
-        [JsonPropertyName("years")]
-        public Dictionary<string, ShippedYear> Years { get; set; } = [];
-    }
+            IReadOnlyList<TmdbMovie> results = await _tmdb.DiscoverMoviesAsync(parameters, cancellationToken).ConfigureAwait(false);
 
-    private sealed class ShippedYear
-    {
-        [JsonPropertyName("minimumVotes")]
-        public int MinimumVotes { get; set; }
+            // TMDB already sorts by rating; ties are broken by more votes, then title, so the order is stable.
+            best = results
+                .Where(m => m.Id > 0 && !string.IsNullOrWhiteSpace(m.Title))
+                .OrderByDescending(m => m.VoteAverage)
+                .ThenByDescending(m => m.VoteCount)
+                .ThenBy(m => m.Title, StringComparer.OrdinalIgnoreCase)
+                .Take(ListSize)
+                .ToList();
+            used = minimumVotes;
+            if (best.Count >= ListSize)
+            {
+                break;
+            }
+        }
 
-        [JsonPropertyName("movies")]
-        public List<ShippedMovie> Movies { get; set; } = [];
-    }
-
-    private sealed class ShippedMovie
-    {
-        [JsonPropertyName("rank")]
-        public int Rank { get; set; }
-
-        [JsonPropertyName("imdbId")]
-        public string ImdbId { get; set; } = string.Empty;
-
-        [JsonPropertyName("title")]
-        public string Title { get; set; } = string.Empty;
-
-        [JsonPropertyName("originalTitle")]
-        public string? OriginalTitle { get; set; }
-
-        [JsonPropertyName("year")]
-        public int Year { get; set; }
-
-        [JsonPropertyName("runtimeMinutes")]
-        public int? RuntimeMinutes { get; set; }
-
-        [JsonPropertyName("rating")]
-        public double Rating { get; set; }
-
-        [JsonPropertyName("votes")]
-        public int Votes { get; set; }
+        _logger.LogInformation("[RaceToFinish] Fetched {Label}: {Count} films (min {Votes} votes)", LabelFor(year), best.Count, used);
+        return (DateTime.UtcNow, used, best);
     }
 
     /// <summary>The server's movies, indexed for matching.</summary>
     private sealed class LibraryIndex
     {
-        private readonly Dictionary<string, BaseItem> _byImdb = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, BaseItem> _byTmdb = new(StringComparer.Ordinal);
         private readonly Dictionary<string, BaseItem> _byTitleYear = new(StringComparer.Ordinal);
 
         public static LibraryIndex Build(ILibraryManager libraryManager)
@@ -249,9 +232,9 @@ public class TopTenService
                     continue;
                 }
 
-                if (item.ProviderIds is not null && item.ProviderIds.TryGetValue("Imdb", out string? imdb) && !string.IsNullOrWhiteSpace(imdb))
+                if (item.ProviderIds is not null && item.ProviderIds.TryGetValue("Tmdb", out string? tmdb) && !string.IsNullOrWhiteSpace(tmdb))
                 {
-                    index._byImdb.TryAdd(imdb.Trim(), item);
+                    index._byTmdb.TryAdd(tmdb.Trim(), item);
                 }
 
                 if (item.ProductionYear is int year)
@@ -267,27 +250,30 @@ public class TopTenService
             return index;
         }
 
-        public (BaseItem? Item, string? How) Find(ShippedMovie movie)
+        public (BaseItem? Item, string? How) Find(TmdbMovie movie)
         {
-            if (!string.IsNullOrEmpty(movie.ImdbId) && _byImdb.TryGetValue(movie.ImdbId, out BaseItem? exact))
+            if (_byTmdb.TryGetValue(movie.Id.ToString(CultureInfo.InvariantCulture), out BaseItem? exact))
             {
-                return (exact, "imdb");
+                return (exact, "tmdb");
             }
 
-            // Fallback for files Jellyfin never matched with IMDb: same title and year (a year either side,
-            // since release years differ by country and between sites).
-            foreach (string? title in new[] { movie.Title, movie.OriginalTitle })
+            // Fallback for files Jellyfin never matched with TMDB: same title and year (a year either side,
+            // since release years differ by country).
+            if (movie.Year is int year)
             {
-                if (string.IsNullOrWhiteSpace(title))
+                foreach (string? title in new[] { movie.Title, movie.OriginalTitle })
                 {
-                    continue;
-                }
-
-                foreach (int y in new[] { movie.Year, movie.Year - 1, movie.Year + 1 })
-                {
-                    if (_byTitleYear.TryGetValue(Key(title, y), out BaseItem? byTitle))
+                    if (string.IsNullOrWhiteSpace(title))
                     {
-                        return (byTitle, "title");
+                        continue;
+                    }
+
+                    foreach (int y in new[] { year, year - 1, year + 1 })
+                    {
+                        if (_byTitleYear.TryGetValue(Key(title, y), out BaseItem? byTitle))
+                        {
+                            return (byTitle, "title");
+                        }
                     }
                 }
             }
